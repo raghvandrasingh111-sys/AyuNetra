@@ -72,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Sanjeevni',
+                'Sanjeevani',
                 style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontSize: 42,
                   fontWeight: FontWeight.bold,

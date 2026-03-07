@@ -51,7 +51,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PrescriptionProvider()),
       ],
       child: MaterialApp(
-        title: 'Sanjeevni',
+        title: 'Sanjeevani',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(

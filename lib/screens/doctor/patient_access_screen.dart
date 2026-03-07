@@ -5,7 +5,7 @@ import '../../providers/access_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/prescription_provider.dart';
 import '../../utils/constants.dart';
-import '../patient/prescription_detail_screen.dart';
+import 'patient_medical_history_screen.dart';
 
 class PatientAccessScreen extends StatefulWidget {
   const PatientAccessScreen({super.key});
@@ -17,8 +17,6 @@ class PatientAccessScreen extends StatefulWidget {
 class _PatientAccessScreenState extends State<PatientAccessScreen> {
   final _aadharController = TextEditingController();
   List<Map<String, dynamic>> _myRequests = const [];
-  List _history = const [];
-  String? _selectedPatientId;
 
   @override
   void initState() {
@@ -86,25 +84,12 @@ class _PatientAccessScreenState extends State<PatientAccessScreen> {
     }
   }
 
-  Future<void> _viewHistory(String patientId) async {
-    final rx = context.read<PrescriptionProvider>();
-    final list = await rx.fetchPatientHistoryAsDoctor(patientId);
-    if (!mounted) return;
-    includeEmptyHistorySnack(list);
-    setState(() {
-      _selectedPatientId = patientId;
-      _history = list;
-    });
-  }
-
-  void includeEmptyHistorySnack(List list) {
-    if (list.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No history found (or access not approved yet).'),
-        ),
-      );
-    }
+  void _viewHistory(String patientId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PatientMedicalHistoryScreen(patientId: patientId),
+      ),
+    );
   }
 
   @override
@@ -174,36 +159,6 @@ class _PatientAccessScreenState extends State<PatientAccessScreen> {
                   requestedAt: r['requested_at']?.toString(),
                 )),
             if (denied.isEmpty) const _EmptyHint(text: 'No denied requests.'),
-
-            if (_selectedPatientId != null) ...[
-              const SizedBox(height: 22),
-              const Divider(),
-              const SizedBox(height: 12),
-              Text(
-                'History',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
-              if (_history.isEmpty)
-                const _EmptyHint(text: 'No reminder history loaded.')
-              else
-                ..._history.map((p) {
-                  return Card(
-                    child: ListTile(
-                      title: const Text('Prescription'),
-                      subtitle: Text('${p.createdAt.day}/${p.createdAt.month}/${p.createdAt.year}'),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => PrescriptionDetailScreen(prescription: p),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                }),
-            ],
           ],
         ),
       ),

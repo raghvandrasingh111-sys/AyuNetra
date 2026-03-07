@@ -263,7 +263,7 @@ class AuthProvider with ChangeNotifier {
           aadharNumber: aadhar,
         );
       } else {
-        // Doctor: registration number must not contain @ (we append @sanjeevni.doctor)
+        // Doctor: registration number must not contain @ (we append @sanjeevani.doctor)
         final regNo = (doctorRegistrationNumber ?? '').trim();
         if (regNo.isEmpty) {
           _errorMessage = 'Please enter your doctor registration number.';
@@ -378,5 +378,31 @@ class AuthProvider with ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  /// Fetch profile by ID. Doctors can fetch patient profiles; users can fetch own.
+  Future<UserModel?> getProfileById(String id) async {
+    try {
+      final profile = await _client
+          .from('profiles')
+          .select()
+          .eq('id', id)
+          .maybeSingle();
+
+      if (profile == null) return null;
+
+      return UserModel(
+        id: profile['id']?.toString() ?? id,
+        email: profile['email']?.toString() ?? '',
+        name: profile['name']?.toString() ?? 'User',
+        userType: profile['user_type']?.toString() ?? 'patient',
+        phone: profile['phone']?.toString(),
+        profileImageUrl: profile['profile_image_url']?.toString(),
+        aadharNumber: profile['aadhar_number']?.toString(),
+        doctorRegistrationNumber: profile['doctor_registration_number']?.toString(),
+      );
+    } catch (_) {
+      return null;
+    }
   }
 }

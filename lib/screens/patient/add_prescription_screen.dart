@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -17,7 +18,10 @@ class AddPrescriptionScreen extends StatefulWidget {
 class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
   final _notesController = TextEditingController();
   final _patientAadharController = TextEditingController();
-  Uint8List? _selectedImageBytes;
+  Uint8List? _selectedFileBytes;
+  bool _isPdf = false;
+  String? _selectedFileName;
+  String _recordType = 'prescription'; // 'prescription' or 'lab_report'
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -37,7 +41,9 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
       final bytes = await image.readAsBytes();
       if (mounted) {
         setState(() {
-          _selectedImageBytes = bytes;
+          _selectedFileBytes = bytes;
+          _isPdf = false;
+          _selectedFileName = image.name;
         });
       }
     }
@@ -53,24 +59,46 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
       final bytes = await image.readAsBytes();
       if (mounted) {
         setState(() {
-          _selectedImageBytes = bytes;
+          _selectedFileBytes = bytes;
+          _isPdf = false;
+          _selectedFileName = image.name;
         });
       }
     }
   }
 
-  Future<String> _uploadImage(Uint8List imageBytes) async {
+  Future<void> _pickPdf() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+      withData: true,
+    );
+
+    if (result != null && result.files.single.bytes != null) {
+      final bytes = result.files.single.bytes!;
+      if (mounted) {
+        setState(() {
+          _selectedFileBytes = bytes;
+          _isPdf = true;
+          _selectedFileName = result.files.single.name;
+        });
+      }
+    }
+  }
+
+  Future<String> _uploadFile(Uint8List bytes, {required String extension}) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final prescriptionProvider =
         Provider.of<PrescriptionProvider>(context, listen: false);
-    return prescriptionProvider.uploadImage(imageBytes, authProvider.currentUser!.id);
+    return prescriptionProvider.uploadFile(bytes, authProvider.currentUser!.id,
+        fileExtension: extension);
   }
 
   Future<void> _savePrescription() async {
-    if (_selectedImageBytes == null) {
+    if (_selectedFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please select an image'),
+          content: Text('Please select an image or PDF file'),
           backgroundColor: Constants.errorColor,
         ),
       );
@@ -122,13 +150,34 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         patientId = authProvider.currentUser!.id;
       }
 
-      // Analyze image with AI from bytes (works on web; avoids CORS)
-      final aiSummary = await prescriptionProvider.analyzePrescriptionFromBytes(_selectedImageBytes!);
+      // Analyze with AI (images only; PDFs get fallback summary)
+      Map<String, dynamic> aiSummary;
+      final isLabReport = _recordType == 'lab_report';
+      if (_isPdf) {
+        aiSummary = {
+          'summary': isLabReport
+              ? 'Lab report PDF document. Review the attached file for details.'
+              : 'PDF prescription document. Review the attached file for details.',
+          'medications': <String>[],
+          'dosage': isLabReport ? null : 'As prescribed',
+          'instructions': isLabReport ? 'Review lab results' : 'Follow doctor\'s instructions',
+        };
+      } else {
+        aiSummary = isLabReport
+            ? {
+                'summary': 'Lab report image. Review the attached file for details.',
+                'medications': <String>[],
+                'dosage': null,
+                'instructions': 'Review lab results',
+              }
+            : await prescriptionProvider.analyzePrescriptionFromBytes(_selectedFileBytes!);
+      }
 
-      // Upload image to Supabase Storage (can fail with 403 if Storage policies missing)
+      // Upload file to Supabase Storage (can fail with 403 if Storage policies missing)
+      final extension = _isPdf ? 'pdf' : 'jpg';
       String imageUrl;
       try {
-        imageUrl = await _uploadImage(_selectedImageBytes!);
+        imageUrl = await _uploadFile(_selectedFileBytes!, extension: extension);
       } catch (e) {
         if (mounted) {
           Navigator.of(context).pop(); // Close loading dialog
@@ -152,6 +201,7 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
             ? null
             : _notesController.text.trim(),
         aiSummary: aiSummary,
+        recordType: _recordType,
       );
 
       if (mounted) {
@@ -160,8 +210,10 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         if (success) {
           Navigator.of(context).pop(); // Go back to dashboard
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Prescription added successfully!'),
+            SnackBar(
+              content: Text(_recordType == 'lab_report'
+                  ? 'Lab report added successfully!'
+                  : 'Prescription added successfully!'),
               backgroundColor: Constants.primaryColor,
             ),
           );
@@ -202,6 +254,41 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
     return 'Something went wrong while uploading file. Please try again.';
   }
 
+  Widget _recordTypeChip({required String label, required IconData icon, required String value}) {
+    final selected = _recordType == value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: selected ? Constants.primaryColor : (isDark ? Colors.white12 : Colors.grey[200]),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () => setState(() => _recordType = value),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black54),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// User-friendly message for other save errors (e.g. DB insert).
   static String _formatPrescriptionError(dynamic e) {
     final s = e.toString().toLowerCase();
@@ -226,6 +313,38 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Record type: Prescription or Lab Report
+            Text(
+              'Record Type',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _recordTypeChip(
+                    label: 'Prescription',
+                    icon: Icons.medication,
+                    value: 'prescription',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _recordTypeChip(
+                    label: 'Lab Report',
+                    icon: Icons.description,
+                    value: 'lab_report',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
             // Image Selection
             GestureDetector(
               onTap: () {
@@ -251,6 +370,14 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
                             _takePhoto();
                           },
                         ),
+                        ListTile(
+                          leading: const Icon(Icons.picture_as_pdf),
+                          title: const Text('Pick PDF File'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _pickPdf();
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -267,7 +394,7 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
                     style: BorderStyle.solid,
                   ),
                 ),
-                child: _selectedImageBytes == null
+                child: _selectedFileBytes == null
                     ? Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -278,7 +405,7 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            'Tap to select prescription image',
+                            'Tap to select image or PDF',
                             style: GoogleFonts.poppins(
                               color: Colors.grey[600],
                               fontSize: 16,
@@ -286,14 +413,36 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
                           ),
                         ],
                       )
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.memory(
-                          _selectedImageBytes!,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                        ),
-                      ),
+                    : _isPdf
+                        ? Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.picture_as_pdf,
+                                size: 80,
+                                color: Colors.red[700],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                _selectedFileName ?? 'PDF Document',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.grey[700],
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          )
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.memory(
+                              _selectedFileBytes!,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            ),
+                          ),
               ),
             ),
             const SizedBox(height: 24),
@@ -331,7 +480,7 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Text(
-                  'Save Prescription',
+                  _recordType == 'lab_report' ? 'Save Lab Report' : 'Save Prescription',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

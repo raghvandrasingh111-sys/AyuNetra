@@ -18,15 +18,15 @@ class PrescriptionProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  /// Upload image to Supabase Storage; returns public URL.
-  /// Throws on failure (e.g. StorageException with 403 if RLS policies missing).
-  Future<String> uploadImage(Uint8List imageBytes, String userId) async {
+  /// Upload file (image or PDF) to Supabase Storage; returns public URL.
+  /// [fileExtension] should be 'jpg', 'jpeg', 'png' for images or 'pdf' for PDFs.
+  Future<String> uploadFile(Uint8List bytes, String userId, {String fileExtension = 'jpg'}) async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
       final path = '$userId/$fileName';
       await _client.storage.from('prescriptions').uploadBinary(
             path,
-            imageBytes,
+            bytes,
             fileOptions: const FileOptions(upsert: true),
           );
       return _client.storage.from('prescriptions').getPublicUrl(path);
@@ -36,6 +36,10 @@ class PrescriptionProvider with ChangeNotifier {
       rethrow;
     }
   }
+
+  /// Legacy alias for image uploads.
+  Future<String> uploadImage(Uint8List imageBytes, String userId) async =>
+      uploadFile(imageBytes, userId, fileExtension: 'jpg');
 
   Future<void> fetchPrescriptions(String userId, String userType) async {
     try {
@@ -126,6 +130,7 @@ class PrescriptionProvider with ChangeNotifier {
     required String imageUrl,
     String? notes,
     Map<String, dynamic>? aiSummary,
+    String recordType = 'prescription',
   }) async {
     try {
       _isLoading = true;
@@ -144,6 +149,7 @@ class PrescriptionProvider with ChangeNotifier {
         'medications': resolved['medications'] ?? [],
         'dosage': resolved['dosage'],
         'instructions': resolved['instructions'],
+        'record_type': recordType,
         'created_at': now,
         'updated_at': now,
       });

@@ -1,4 +1,4 @@
-# Supabase backend setup for Sanjeevni
+# Supabase backend setup for Sanjeevani
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. In **Project Settings → API**, copy the **Project URL** and **anon public** key into `lib/utils/constants.dart`:
@@ -101,7 +101,7 @@ CREATE POLICY "Doctors can view patient profiles for lookup"
 ```
 
 - **Patient signup**: requires email + unique 12-digit Aadhar.
-- **Doctor login/signup**: uses Doctor Registration Number + password (stored internally as `{number}@sanjeevni.doctor`).
+- **Doctor login/signup**: uses Doctor Registration Number + password (stored internally as `{number}@sanjeevani.doctor`).
 - **Doctor upload prescription**: doctor enters patient’s Aadhar number; app finds the patient and links the prescription.
 
 ---
@@ -203,5 +203,22 @@ CREATE POLICY "Users can delete own prescription uploads"
 ```
 
 If you see "policy already exists", the policies are there; you can skip or drop and re-create.
+
+---
+
+## Migration: Record type (Prescription vs Lab Report)
+
+Run this in the SQL Editor to support separate Prescriptions and Lab Reports:
+
+```sql
+-- Add record_type column (prescription | lab_report)
+ALTER TABLE public.prescriptions
+  ADD COLUMN IF NOT EXISTS record_type TEXT NOT NULL DEFAULT 'prescription'
+  CHECK (record_type IN ('prescription', 'lab_report'));
+```
+
+Existing rows will default to `'prescription'`. New uploads can be saved as either prescriptions or lab reports.
+
+---
 
 After this, run `flutter pub get` and configure `Constants.supabaseUrl` and `Constants.supabaseAnonKey` in `lib/utils/constants.dart`.

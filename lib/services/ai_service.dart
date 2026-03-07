@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -23,28 +22,38 @@ class AIService {
 
     try {
       final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-      final inputImage = await _inputImageFromBytes(imageBytes);
-      if (inputImage == null) {
+      final result = await _inputImageFromBytes(imageBytes);
+      if (result == null) {
         return _fallbackSummary('Could not read image. Please try another photo.');
       }
 
-      final recognizedText = await textRecognizer.processImage(inputImage);
-      await textRecognizer.close();
+      final inputImage = result.$1;
+      final tempFile = result.$2;
 
-      final fullText = recognizedText.text.trim();
-      if (fullText.isEmpty) {
-        return _fallbackSummary(
-          'No text was found in this image. Please use a clearer photo of the prescription.',
-        );
+      try {
+        final recognizedText = await textRecognizer.processImage(inputImage);
+        await textRecognizer.close();
+
+        final fullText = recognizedText.text.trim();
+        if (fullText.isEmpty) {
+          return _fallbackSummary(
+            'No text was found in this image. Please use a clearer photo of the prescription.',
+          );
+        }
+
+        final parsed = _parsePrescriptionText(fullText);
+        return {
+          'summary': parsed['summary'] as String,
+          'medications': parsed['medications'] as List<String>,
+          'dosage': parsed['dosage'] as String,
+          'instructions': parsed['instructions'] as String,
+        };
+      } finally {
+        // Delete temp file only after ML Kit has finished reading it
+        try {
+          await tempFile.delete();
+        } catch (_) {}
       }
-
-      final parsed = _parsePrescriptionText(fullText);
-      return {
-        'summary': parsed['summary'] as String,
-        'medications': parsed['medications'] as List<String>,
-        'dosage': parsed['dosage'] as String,
-        'instructions': parsed['instructions'] as String,
-      };
     } catch (e, stack) {
       return _fallbackSummary(
         'Unable to read prescription from image. Please enter details manually.',
@@ -54,15 +63,15 @@ class AIService {
   }
 
   /// Creates InputImage from bytes. On mobile, writes to a temp file so ML Kit can decode correctly.
-  Future<InputImage?> _inputImageFromBytes(Uint8List bytes) async {
+  /// Returns (InputImage, File) - do NOT delete the file until after processImage() completes.
+  Future<(InputImage, File)?> _inputImageFromBytes(Uint8List bytes) async {
     if (kIsWeb) return null;
     try {
       final tempDir = Directory.systemTemp;
-      final file = File('${tempDir.path}/sanjeevni_prescription_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final file = File('${tempDir.path}/sanjeevani_prescription_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await file.writeAsBytes(bytes);
       final inputImage = InputImage.fromFilePath(file.path);
-      try { await file.delete(); } catch (_) {}
-      return inputImage;
+      return (inputImage, file);
     } catch (_) {
       return null;
     }

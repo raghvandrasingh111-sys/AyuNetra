@@ -1,3 +1,4 @@
+/// Record type: 'prescription' or 'lab_report'
 class Prescription {
   final String id;
   final String doctorId;
@@ -8,6 +9,7 @@ class Prescription {
   final List<String>? medications;
   final String? dosage;
   final String? instructions;
+  final String recordType; // 'prescription' or 'lab_report'
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,9 +23,12 @@ class Prescription {
     this.medications,
     this.dosage,
     this.instructions,
+    this.recordType = 'prescription',
     required this.createdAt,
     required this.updatedAt,
   });
+
+  bool get isLabReport => recordType == 'lab_report';
 
   factory Prescription.fromJson(Map<String, dynamic> json) {
     return Prescription(
@@ -38,6 +43,7 @@ class Prescription {
           : null,
       dosage: json['dosage'] as String?,
       instructions: json['instructions'] as String?,
+      recordType: json['record_type'] as String? ?? 'prescription',
       createdAt: _parseDateTime(json['created_at']),
       updatedAt: _parseDateTime(json['updated_at']),
     );
@@ -60,6 +66,7 @@ class Prescription {
       'medications': medications,
       'dosage': dosage,
       'instructions': instructions,
+      'record_type': recordType,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };

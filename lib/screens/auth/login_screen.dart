@@ -167,7 +167,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      'Sanjeevni',
+                      'Sanjeevani',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.poppins(
                         fontSize: 30,

@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 
 class Constants {
   // Supabase - Replace with your project URL and anon key from Supabase dashboard
-  static const String supabaseUrl = 'https://yhsoxjhwewjjgfutcbdx.supabase.co';
+  static const String supabaseUrl = 'https://qqmnyvdkbblekwvibaqp.supabase.co';
   static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inloc294amh3ZXdqamdmdXRjYmR4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0OTE1MDYsImV4cCI6MjA4NTA2NzUwNn0.uEvdI4tCGfsTEzdHPlh3sJbUEE51SA5g1J4BO-dpkBM';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxbW55dmRrYmJsZWt3dmliYXFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MDg0MzEsImV4cCI6MjA4ODM4NDQzMX0.wxTOOavT5zhjH3Tl_J-gMqrjl3Y9kjFqp8VWyyLYShI';
   // static const String supabaseUrl = 'https://xjixpmxichjrlagwomev.supabase.co';
   // static const String supabaseAnonKey =
   //     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqaXhwbXhpY2hqcmxhZ3dvbWV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDU0NTcsImV4cCI6MjA4NTA4MTQ1N30.KJ7BWOvWv_w1RUbpqeiGmre41D8777bKdCL2lzapGLo';
 
   /// Used for doctor login: email = registrationNumber + this suffix
-  static const String doctorEmailSuffix = '@sanjeevni.doctor';
+  static const String doctorEmailSuffix = '@sanjeevani.doctor';
 
   // Google Generative AI - Replace with your key from https://aistudio.google.com/apikey
   static const String geminiApiKey = 'AIzaSyD0fbgr7d53ncLZzehAG3lfjDPB4NVZVlE';

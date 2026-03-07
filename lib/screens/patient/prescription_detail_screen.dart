@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/prescription_model.dart';
 import '../../utils/constants.dart';
 import '../../services/ai_service.dart';
@@ -51,32 +52,17 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Prescription Details'),
+        title: Text(
+          widget.prescription.isLabReport ? 'Lab Report Details' : 'Prescription Details',
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(Constants.paddingLarge),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Prescription Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: CachedNetworkImage(
-                imageUrl: widget.prescription.imageUrl,
-                placeholder: (context, url) => Container(
-                  height: 300,
-                  color: Colors.grey[200],
-                  child: const Center(child: CircularProgressIndicator()),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  height: 300,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.error),
-                ),
-                fit: BoxFit.cover,
-                width: double.infinity,
-              ),
-            ),
+            // Prescription document (image or PDF)
+            _buildDocumentPreview(context),
             const SizedBox(height: 24),
 
             // Extracted summary from prescription image
@@ -204,5 +190,66 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year} at ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  bool get _isPdfUrl =>
+      widget.prescription.imageUrl.toLowerCase().endsWith('.pdf');
+
+  Widget _buildDocumentPreview(BuildContext context) {
+    if (_isPdfUrl) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 200,
+          width: double.infinity,
+          color: Colors.grey[200],
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.picture_as_pdf, size: 64, color: Colors.red[700]),
+              const SizedBox(height: 12),
+              Text(
+                'PDF Document',
+                style: GoogleFonts.poppins(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  final uri = Uri.parse(widget.prescription.imageUrl);
+                  if (await canLaunchUrl(uri)) {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+                icon: const Icon(Icons.open_in_new, size: 18),
+                label: const Text('View PDF'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: CachedNetworkImage(
+        imageUrl: widget.prescription.imageUrl,
+        placeholder: (context, url) => Container(
+          height: 300,
+          color: Colors.grey[200],
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        errorWidget: (context, url, error) => Container(
+          height: 300,
+          color: Colors.grey[200],
+          child: const Icon(Icons.error),
+        ),
+        fit: BoxFit.cover,
+        width: double.infinity,
+      ),
+    );
   }
 }

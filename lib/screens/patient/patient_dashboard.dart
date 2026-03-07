@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/prescription_provider.dart';
 import '../../utils/constants.dart';
 import '../../screens/auth/login_screen.dart';
+import '../doctor/patient_medical_history_screen.dart';
 import 'prescription_detail_screen.dart';
 import 'add_prescription_screen.dart';
 import 'doctor_access_requests_view.dart';
@@ -16,8 +17,11 @@ class PatientDashboard extends StatefulWidget {
   State<PatientDashboard> createState() => _PatientDashboardState();
 }
 
+enum _RecordsFilter { all, prescriptions, labReports }
+
 class _PatientDashboardState extends State<PatientDashboard> {
   int _selectedNavIndex = 0;
+  _RecordsFilter _recordsFilter = _RecordsFilter.all;
 
   @override
   void initState() {
@@ -117,7 +121,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ),
           const SizedBox(width: 12),
           Text(
-            'Sanjeevni',
+            'Sanjeevani',
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.bold,
@@ -509,16 +513,41 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   : Colors.black87,
             ),
           ),
-          TextButton(
-            onPressed: () => setState(() => _selectedNavIndex = 1),
-            child: Text(
-              'View All',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Constants.primaryColor,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(
+                onPressed: () {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => PatientMedicalHistoryScreen(
+                        patientId: authProvider.currentUser!.id,
+                      ),
+                    ),
+                  );
+                },
+                child: Text(
+                  'Medical History',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Constants.primaryColor,
+                  ),
+                ),
               ),
-            ),
+              TextButton(
+                onPressed: () => setState(() => _selectedNavIndex = 1),
+                child: Text(
+                  'View All',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Constants.primaryColor,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -574,6 +603,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
     Color iconColor,
   ) {
     final dateStr = _formatDateLong(prescription.createdAt);
+    final isLabReport = prescription.recordType == 'lab_report';
+    final displayIcon = isLabReport ? Icons.description : icon;
+    final typeLabel = isLabReport ? 'Lab Report' : 'Prescription';
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -605,7 +637,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       color: iconColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(icon, color: iconColor, size: 24),
+                    child: Icon(displayIcon, color: iconColor, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -621,7 +653,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                     ? prescription.aiSummary!.length > 30
                                         ? '${prescription.aiSummary!.substring(0, 30)}...'
                                         : prescription.aiSummary!
-                                    : 'Prescription',
+                                    : typeLabel,
                                 style: GoogleFonts.inter(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
@@ -641,7 +673,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Prescription',
+                          typeLabel,
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
@@ -708,12 +740,23 @@ class _PatientDashboardState extends State<PatientDashboard> {
     );
   }
 
+  List<dynamic> _filterRecords(List<dynamic> list) {
+    switch (_recordsFilter) {
+      case _RecordsFilter.prescriptions:
+        return list.where((p) => p.recordType != 'lab_report').toList();
+      case _RecordsFilter.labReports:
+        return list.where((p) => p.recordType == 'lab_report').toList();
+      case _RecordsFilter.all:
+        return list;
+    }
+  }
+
   Widget _buildRecordsView(
     BuildContext context,
     PrescriptionProvider prescriptionProvider,
     bool isDark,
   ) {
-    final list = prescriptionProvider.prescriptions;
+    final list = _filterRecords(prescriptionProvider.prescriptions);
     return RefreshIndicator(
       onRefresh: () async => _loadPrescriptions(),
       child: list.isEmpty
@@ -725,20 +768,64 @@ class _PatientDashboardState extends State<PatientDashboard> {
                 ),
               ],
             )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: list.length,
-              itemBuilder: (context, index) {
-                final p = list[index];
-                return _activityTile(
-                  context,
-                  p,
-                  isDark,
-                  Icons.receipt_long,
-                  Constants.primaryColor,
-                );
-              },
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _recordsFilterChip('All', _RecordsFilter.all, isDark),
+                        const SizedBox(width: 8),
+                        _recordsFilterChip('Prescriptions', _RecordsFilter.prescriptions, isDark),
+                        const SizedBox(width: 8),
+                        _recordsFilterChip('Lab Reports', _RecordsFilter.labReports, isDark),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: list.length,
+                    itemBuilder: (context, index) {
+                      final p = list[index];
+                      return _activityTile(
+                        context,
+                        p,
+                        isDark,
+                        Icons.receipt_long,
+                        Constants.primaryColor,
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
+    );
+  }
+
+  Widget _recordsFilterChip(String label, _RecordsFilter value, bool isDark) {
+    final selected = _recordsFilter == value;
+    return GestureDetector(
+      onTap: () => setState(() => _recordsFilter = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Constants.primaryColor : (isDark ? Colors.white12 : Colors.grey[200]),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+          ),
+        ),
+      ),
     );
   }
 
