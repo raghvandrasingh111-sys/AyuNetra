@@ -13,7 +13,7 @@ class Constants {
   static const String doctorEmailSuffix = '@ayunetra.doctor';
 
   // Google Generative AI - Replace with your key from https://aistudio.google.com/apikey
-  static const String geminiApiKey = 'AIzaSyCqdN8icLylFqalaZWWJvTlry6NhE2oUGQ';
+  static const String geminiApiKey = 'AIzaSyC_DXrNPZPF6xCqBK28tyh_gXNmjJY6jig';
 
   // App Colors (Figma / AyuNetra design)
   static const Color primaryColor = Color(0xFF13EC92);
