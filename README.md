@@ -1,4 +1,4 @@
-# Sanjeevani - Medical Data Management App
+# AyuNetra - Medical Data Management App
 
 A Flutter application for storing and managing medical prescriptions with AI-powered patient briefing capabilities.
 
