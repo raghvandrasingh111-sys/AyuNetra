@@ -68,7 +68,7 @@ class AIService {
     if (kIsWeb) return null;
     try {
       final tempDir = Directory.systemTemp;
-      final file = File('${tempDir.path}/sanjeevani_prescription_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final file = File('${tempDir.path}/ayunetra_prescription_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await file.writeAsBytes(bytes);
       final inputImage = InputImage.fromFilePath(file.path);
       return (inputImage, file);

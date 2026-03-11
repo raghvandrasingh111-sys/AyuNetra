@@ -263,7 +263,7 @@ class AuthProvider with ChangeNotifier {
           aadharNumber: aadhar,
         );
       } else {
-        // Doctor: registration number must not contain @ (we append @sanjeevani.doctor)
+        // Doctor: registration number must not contain @ (we append @ayunetra.doctor)
         final regNo = (doctorRegistrationNumber ?? '').trim();
         if (regNo.isEmpty) {
           _errorMessage = 'Please enter your doctor registration number.';

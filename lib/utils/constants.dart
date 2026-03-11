@@ -10,12 +10,12 @@ class Constants {
   //     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqaXhwbXhpY2hqcmxhZ3dvbWV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDU0NTcsImV4cCI6MjA4NTA4MTQ1N30.KJ7BWOvWv_w1RUbpqeiGmre41D8777bKdCL2lzapGLo';
 
   /// Used for doctor login: email = registrationNumber + this suffix
-  static const String doctorEmailSuffix = '@sanjeevani.doctor';
+  static const String doctorEmailSuffix = '@ayunetra.doctor';
 
   // Google Generative AI - Replace with your key from https://aistudio.google.com/apikey
-  static const String geminiApiKey = 'AIzaSyD0fbgr7d53ncLZzehAG3lfjDPB4NVZVlE';
+  static const String geminiApiKey = 'AIzaSyCqdN8icLylFqalaZWWJvTlry6NhE2oUGQ';
 
-  // App Colors (Figma / Sanjeevani design)
+  // App Colors (Figma / AyuNetra design)
   static const Color primaryColor = Color(0xFF13EC92);
   static const Color secondaryColor = Color(0xFF13EC92);
   static const Color accentColor = Color(0xFF13EC92);

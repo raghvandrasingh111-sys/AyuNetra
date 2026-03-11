@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Sanjeevani</string>
+	<string>AyuNetra</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -45,9 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Sanjeevani needs access to your photos to upload prescription images.</string>
+	<string>AyuNetra needs access to your photos to upload prescription images.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Sanjeevani needs camera access to capture prescription images.</string>
+	<string>AyuNetra needs camera access to capture prescription images.</string>
 </dict>
 </plist>

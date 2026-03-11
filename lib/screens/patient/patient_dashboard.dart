@@ -9,6 +9,7 @@ import '../doctor/patient_medical_history_screen.dart';
 import 'prescription_detail_screen.dart';
 import 'add_prescription_screen.dart';
 import 'doctor_access_requests_view.dart';
+import 'ai_summary_screen.dart';
 
 class PatientDashboard extends StatefulWidget {
   const PatientDashboard({super.key});
@@ -91,6 +92,29 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ],
         ),
       ),
+      floatingActionButton: _selectedNavIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AISummaryScreen(
+                      patient: authProvider.currentUser!,
+                      records: prescriptionProvider.prescriptions,
+                    ),
+                  ),
+                );
+              },
+              backgroundColor: Constants.primaryColor,
+              icon: const Icon(Icons.auto_awesome, color: Constants.backgroundDark),
+              label: Text(
+                'AI Health Summary',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: Constants.backgroundDark,
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -121,7 +145,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ),
           const SizedBox(width: 12),
           Text(
-            'Sanjeevani',
+            'AyuNetra',
             style: GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.bold,

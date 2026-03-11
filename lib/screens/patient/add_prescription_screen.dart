@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/prescription_provider.dart';
+import '../../services/gemini_service.dart';
 import '../../utils/constants.dart';
 
 class AddPrescriptionScreen extends StatefulWidget {
@@ -150,27 +151,24 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         patientId = authProvider.currentUser!.id;
       }
 
-      // Analyze with AI (images only; PDFs get fallback summary)
+      // Analyze with AI
       Map<String, dynamic> aiSummary;
       final isLabReport = _recordType == 'lab_report';
-      if (_isPdf) {
+      
+      if (isLabReport) {
+        // Use Gemini for Lab Reports (both Image and PDF)
+        aiSummary = await GeminiService().analyzeLabReport(_selectedFileBytes!, _isPdf);
+      } else if (_isPdf) {
+        // Fallback for PDF Prescriptions (since AIService OCR is image-only)
         aiSummary = {
-          'summary': isLabReport
-              ? 'Lab report PDF document. Review the attached file for details.'
-              : 'PDF prescription document. Review the attached file for details.',
+          'summary': 'PDF prescription document. Review the attached file for details.',
           'medications': <String>[],
-          'dosage': isLabReport ? null : 'As prescribed',
-          'instructions': isLabReport ? 'Review lab results' : 'Follow doctor\'s instructions',
+          'dosage': 'As prescribed',
+          'instructions': 'Follow doctor\'s instructions',
         };
       } else {
-        aiSummary = isLabReport
-            ? {
-                'summary': 'Lab report image. Review the attached file for details.',
-                'medications': <String>[],
-                'dosage': null,
-                'instructions': 'Review lab results',
-              }
-            : await prescriptionProvider.analyzePrescriptionFromBytes(_selectedFileBytes!);
+        // Use on-device OCR for Image Prescriptions
+        aiSummary = await prescriptionProvider.analyzePrescriptionFromBytes(_selectedFileBytes!);
       }
 
       // Upload file to Supabase Storage (can fail with 403 if Storage policies missing)
