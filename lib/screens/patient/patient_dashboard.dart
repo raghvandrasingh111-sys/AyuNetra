@@ -23,6 +23,13 @@ enum _RecordsFilter { all, prescriptions, labReports }
 class _PatientDashboardState extends State<PatientDashboard> {
   int _selectedNavIndex = 0;
   _RecordsFilter _recordsFilter = _RecordsFilter.all;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -67,11 +74,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final recentCount = _recentVisitsThisMonth(prescriptions);
 
     return Scaffold(
-      backgroundColor: isDark ? Constants.backgroundDark : Constants.backgroundLight,
+      backgroundColor: isDark ? const Color(0xFF0F172A) : Constants.backgroundLight,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context, authProvider),
+            if (_selectedNavIndex == 0) _buildHeader(context, authProvider),
             Expanded(
               child: _selectedNavIndex == 0
                   ? _buildHomeContent(
@@ -92,25 +99,44 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ],
         ),
       ),
-      floatingActionButton: _selectedNavIndex == 0
+      floatingActionButton: _selectedNavIndex == 0 || _selectedNavIndex == 1
           ? FloatingActionButton.extended(
               onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AISummaryScreen(
-                      patient: authProvider.currentUser!,
-                      records: prescriptionProvider.prescriptions,
+                if (_selectedNavIndex == 0) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => AISummaryScreen(
+                        patient: authProvider.currentUser!,
+                        records: prescriptionProvider.prescriptions,
+                      ),
                     ),
-                  ),
-                );
+                  );
+                } else if (_selectedNavIndex == 1) {
+                  Navigator.of(context)
+                      .push(
+                        MaterialPageRoute(
+                          builder: (_) => const AddPrescriptionScreen(),
+                        ),
+                      )
+                      .then((_) => _loadPrescriptions());
+                }
               },
               backgroundColor: Constants.primaryColor,
-              icon: const Icon(Icons.auto_awesome, color: Constants.backgroundDark),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+                side: BorderSide(color: Colors.white.withOpacity(0.2), width: 1),
+              ),
+              elevation: 8,
+              icon: Icon(
+                _selectedNavIndex == 0 ? Icons.auto_awesome : Icons.add, 
+                color: Colors.white
+              ),
               label: Text(
-                'AI Health Summary',
+                _selectedNavIndex == 0 ? 'AI Health Summary' : 'Add Record',
                 style: GoogleFonts.inter(
+                  fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Constants.backgroundDark,
+                  color: Colors.white,
                 ),
               ),
             )
@@ -119,17 +145,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildHeader(BuildContext context, AuthProvider authProvider) {
+    final user = authProvider.currentUser!;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: (isDark ? Constants.backgroundDark : Constants.backgroundLight)
-            .withOpacity(0.8),
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12,
-          ),
-        ),
+        color: (isDark ? Constants.backgroundDark : Constants.backgroundLight).withOpacity(0.8),
       ),
       child: Row(
         children: [
@@ -137,37 +158,75 @@ class _PatientDashboardState extends State<PatientDashboard> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Constants.primaryColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Constants.primaryColor.withOpacity(0.3)),
+              shape: BoxShape.circle,
+              border: Border.all(color: Constants.primaryColor.withOpacity(0.2), width: 2),
             ),
-            child: const Icon(Icons.health_and_safety, color: Constants.primaryColor, size: 24),
+            child: user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
+                ? ClipOval(
+                    child: Image.network(user.profileImageUrl!, fit: BoxFit.cover),
+                  )
+                : const Icon(Icons.person, color: Constants.primaryColor),
           ),
           const SizedBox(width: 12),
-          Text(
-            'AyuNetra',
-            style: GoogleFonts.inter(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'AyuNetra',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              Text(
+                'Wellness AI',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Constants.primaryColor,
+                ),
+              ),
+            ],
           ),
           const Spacer(),
           IconButton(
             onPressed: () {},
             icon: Icon(
-              Icons.notifications_outlined,
-              color: isDark ? Colors.white70 : Colors.black54,
+              Icons.search,
+              color: isDark ? Colors.white70 : Colors.black87,
             ),
           ),
-          IconButton(
-            onPressed: () {
-              _showSettingsOrLogout(context, authProvider);
-            },
-            icon: Icon(
-              Icons.settings_outlined,
-              color: isDark ? Colors.white70 : Colors.black54,
-            ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                onPressed: () {
+                  _showSettingsOrLogout(context, authProvider);
+                },
+                icon: Icon(
+                  Icons.notifications_outlined,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isDark ? Constants.backgroundDark : Colors.white,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -245,103 +304,34 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   Widget _buildProfileSection(user, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Constants.primaryColor, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Constants.primaryColor.withOpacity(0.15),
-                      blurRadius: 12,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                  color: isDark ? Constants.cardDark : Colors.white,
-                ),
-                child: user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
-                    ? ClipOval(
-                        child: Image.network(
-                          user.profileImageUrl!,
-                          fit: BoxFit.cover,
-                          width: 80,
-                          height: 80,
-                        ),
-                      )
-                    : Center(
-                        child: Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Constants.primaryColor.withOpacity(0.8),
-                        ),
-                      ),
-              ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Constants.primaryColor,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? Constants.backgroundDark : Constants.backgroundLight,
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(Icons.verified, size: 14, color: Constants.backgroundDark),
-                ),
-              ),
-            ],
+          Text(
+            'Welcome back,',
+            style: GoogleFonts.inter(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back,',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                Text(
-                  user.name,
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.fingerprint,
-                      size: 16,
-                      color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _maskAadhar(user.aadharNumber),
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          Text(
+            user.name.split(' ').first,
+            style: GoogleFonts.inter(
+              fontSize: 30,
+              fontWeight: FontWeight.w900,
+              color: Constants.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Your health dashboard is up to date.',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
             ),
           ),
         ],
@@ -351,108 +341,102 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
   Widget _buildStatsGrid(int totalRecords, int recentVisits, bool isDark) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           Expanded(
-            child: _statCard(
-              icon: Icons.folder_open,
-              label: 'Total Records',
-              value: '$totalRecords',
-              badge: recentVisits > 0 ? '+$recentVisits new' : null,
-              isDark: isDark,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _statCard(
-              icon: Icons.calendar_today,
-              label: 'Recent Visits',
-              value: '$recentVisits',
-              subtitle: 'This month',
-              isDark: isDark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    String? badge,
-    String? subtitle,
-    required bool isDark,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? Constants.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.black12,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: Constants.primaryColor, size: 24),
-              if (badge != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Constants.primaryColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Constants.primaryColor.withOpacity(0.1),
+                border: Border.all(color: Constants.primaryColor.withOpacity(0.05)),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Icon(Icons.folder_open, color: Constants.primaryColor, size: 24),
+                      Text(
+                        '+$recentVisits this month'.toUpperCase(),
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: Constants.primaryColor,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    badge,
+                  const SizedBox(height: 12),
+                  Text(
+                    'Total Records',
                     style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Constants.primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
                     ),
                   ),
-                )
-              else if (subtitle != null)
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Constants.textMutedLight,
+                  const SizedBox(height: 4),
+                  Text(
+                    '$totalRecords',
+                    style: GoogleFonts.inter(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label.toUpperCase(),
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.2,
-              color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.inter(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
+          const SizedBox(width: 16),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                border: Border.all(color: isDark ? Colors.white12 : Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Icon(Icons.calendar_today, color: isDark ? Colors.white54 : Colors.black45, size: 24),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Recent Visits',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$recentVisits',
+                    style: GoogleFonts.inter(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -461,60 +445,122 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Widget _buildUploadButton(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: Constants.primaryColor,
-        borderRadius: BorderRadius.circular(16),
-        shadowColor: Constants.primaryColor.withOpacity(0.3),
-        elevation: 8,
-        child: InkWell(
-          onTap: () {
-            Navigator.of(context)
-                .push(
-                  MaterialPageRoute(
-                    builder: (_) => const AddPrescriptionScreen(),
-                  ),
-                )
-                .then((_) => _loadPrescriptions());
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context)
+              .push(
+                MaterialPageRoute(
+                  builder: (_) => const AddPrescriptionScreen(),
+                ),
+              )
+              .then((_) => _loadPrescriptions());
+        },
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white, // slate-800
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Constants.primaryColor.withOpacity(0.1)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                top: -30,
+                right: -30,
+                child: Container(
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
-                    color: Constants.backgroundDark.withOpacity(0.1),
                     shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.add_a_photo,
-                    size: 32,
-                    color: Constants.backgroundDark,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Upload New Record',
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Constants.backgroundDark,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Constants.primaryColor.withOpacity(0.15),
+                        blurRadius: 40,
+                        spreadRadius: 20,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Scan prescriptions or lab reports',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Constants.backgroundDark.withOpacity(0.7),
-                  ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Constants.primaryColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.cloud_upload_outlined,
+                              size: 28,
+                              color: Constants.primaryColor,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Upload New Record',
+                            style: GoogleFonts.inter(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Add medical reports or prescriptions',
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Constants.primaryColor,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Get Started',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.arrow_forward, size: 16, color: Colors.white),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -537,41 +583,16 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   : Colors.black87,
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextButton(
-                onPressed: () {
-                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PatientMedicalHistoryScreen(
-                        patientId: authProvider.currentUser!.id,
-                      ),
-                    ),
-                  );
-                },
-                child: Text(
-                  'Medical History',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Constants.primaryColor,
-                  ),
-                ),
+          InkWell(
+            onTap: () => setState(() => _selectedNavIndex = 1),
+            child: Text(
+              'View all',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Constants.primaryColor,
               ),
-              TextButton(
-                onPressed: () => setState(() => _selectedNavIndex = 1),
-                child: Text(
-                  'View All',
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Constants.primaryColor,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ],
       ),
@@ -623,98 +644,97 @@ class _PatientDashboardState extends State<PatientDashboard> {
     BuildContext context,
     prescription,
     bool isDark,
-    IconData icon,
-    Color iconColor,
+    IconData defaultIcon,
+    Color defaultIconColor,
   ) {
     final dateStr = _formatDateLong(prescription.createdAt);
     final isLabReport = prescription.recordType == 'lab_report';
-    final displayIcon = isLabReport ? Icons.description : icon;
-    final typeLabel = isLabReport ? 'Lab Report' : 'Prescription';
+    final String title = isLabReport ? 'Lab Report' : 'Prescription';
+    final IconData dispIcon = isLabReport ? Icons.science_outlined : Icons.receipt_long;
+    final Color bgCol = isLabReport ? Colors.blue : Colors.orange;
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: isDark ? Constants.cardDark : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => PrescriptionDetailScreen(prescription: prescription),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PrescriptionDetailScreen(prescription: prescription),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.0 : 0.05),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
               ),
-            );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? Colors.white.withOpacity(0.05) : Colors.black12,
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: isDark ? bgCol.withOpacity(0.2) : bgCol.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(dispIcon, color: isDark ? bgCol.withAlpha(200) : bgCol, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      prescription.aiSummary != null && prescription.aiSummary!.isNotEmpty
+                          ? prescription.aiSummary!.length > 25
+                              ? '${prescription.aiSummary!.substring(0, 25)}...'
+                              : prescription.aiSummary!
+                          : title,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Medical Record • AyuNetra',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      dateStr,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: iconColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(displayIcon, color: iconColor, size: 24),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                prescription.aiSummary != null &&
-                                        prescription.aiSummary!.isNotEmpty
-                                    ? prescription.aiSummary!.length > 30
-                                        ? '${prescription.aiSummary!.substring(0, 30)}...'
-                                        : prescription.aiSummary!
-                                    : typeLabel,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              dateStr,
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          typeLabel,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right,
-                    color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
-                  ),
-                ],
+              Icon(
+                Icons.chevron_right,
+                size: 24,
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
               ),
-            ),
+            ],
           ),
         ),
+      ),
     );
   }
 
@@ -765,14 +785,27 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   List<dynamic> _filterRecords(List<dynamic> list) {
+    var filtered = list;
     switch (_recordsFilter) {
       case _RecordsFilter.prescriptions:
-        return list.where((p) => p.recordType != 'lab_report').toList();
+        filtered = list.where((p) => p.recordType != 'lab_report').toList();
+        break;
       case _RecordsFilter.labReports:
-        return list.where((p) => p.recordType == 'lab_report').toList();
+        filtered = list.where((p) => p.recordType == 'lab_report').toList();
+        break;
       case _RecordsFilter.all:
-        return list;
+        break;
     }
+
+    if (_searchController.text.isNotEmpty) {
+      final query = _searchController.text.toLowerCase();
+      filtered = filtered.where((p) {
+        final summary = (p.aiSummary ?? '').toLowerCase();
+        return summary.contains(query);
+      }).toList();
+    }
+
+    return filtered;
   }
 
   Widget _buildRecordsView(
@@ -783,21 +816,66 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final list = _filterRecords(prescriptionProvider.prescriptions);
     return RefreshIndicator(
       onRefresh: () async => _loadPrescriptions(),
-      child: list.isEmpty
-          ? ListView(
-              children: [
-                SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.5,
-                  child: _buildEmptyActivity(isDark),
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: SingleChildScrollView(
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Container(
+              color: isDark ? const Color(0xFF0F172A).withOpacity(0.8) : Colors.white.withOpacity(0.8),
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 24, bottom: 8),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white12 : Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.arrow_back, size: 20),
+                      ),
+                      Text(
+                        'Medical Records',
+                        style: GoogleFonts.inter(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white12 : Colors.grey.shade100,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.more_vert, size: 20),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: (val) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Search by doctor or clinic...',
+                        hintStyle: TextStyle(color: isDark ? Colors.white54 : Colors.grey.shade500),
+                        prefixIcon: Icon(Icons.search, color: isDark ? Colors.white54 : Colors.grey.shade400),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
@@ -809,25 +887,51 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       ],
                     ),
                   ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: list.length,
-                    itemBuilder: (context, index) {
-                      final p = list[index];
-                      return _activityTile(
-                        context,
-                        p,
-                        isDark,
-                        Icons.receipt_long,
-                        Constants.primaryColor,
-                      );
-                    },
+                ],
+              ),
+            ),
+          ),
+          if (list.isEmpty)
+            SliverFillRemaining(
+              child: _buildEmptyActivity(isDark),
+            )
+          else ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'RECENT UPLOADS',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                    color: isDark ? Colors.white54 : Colors.grey.shade500,
                   ),
                 ),
-              ],
+              ),
             ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final p = list[index];
+                    return _activityTile(
+                      context,
+                      p,
+                      isDark,
+                      Icons.receipt_long,
+                      Constants.primaryColor,
+                    );
+                  },
+                  childCount: list.length,
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ]
+        ],
+      ),
     );
   }
 
@@ -836,17 +940,23 @@ class _PatientDashboardState extends State<PatientDashboard> {
     return GestureDetector(
       onTap: () => setState(() => _recordsFilter = value),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
         decoration: BoxDecoration(
-          color: selected ? Constants.primaryColor : (isDark ? Colors.white12 : Colors.grey[200]),
+          color: selected
+              ? Constants.primaryColor
+              : (isDark ? const Color(0xFF1E293B) : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(999),
         ),
+        alignment: Alignment.center,
         child: Text(
           label,
           style: GoogleFonts.inter(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected
+                ? Colors.white
+                : (isDark ? Colors.white70 : Colors.black87),
           ),
         ),
       ),
@@ -891,78 +1001,282 @@ class _PatientDashboardState extends State<PatientDashboard> {
     bool isDark,
   ) {
     final user = authProvider.currentUser!;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          const SizedBox(height: 24),
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Constants.primaryColor.withOpacity(0.2),
-              border: Border.all(color: Constants.primaryColor),
-            ),
-            child: user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
-                ? ClipOval(
-                    child: Image.network(user.profileImageUrl!, fit: BoxFit.cover),
-                  )
-                : Icon(Icons.person, size: 48, color: Constants.primaryColor),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            user.name,
-            style: GoogleFonts.inter(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white : Colors.black87,
-            ),
-          ),
-          if (user.aadharNumber != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _maskAadhar(user.aadharNumber),
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                color: isDark ? Constants.textMutedDark : Constants.textMutedLight,
-              ),
-            ),
-          ],
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () async {
-                await authProvider.signOut();
-                if (context.mounted) {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
-                }
-              },
-              icon: const Icon(Icons.logout),
-              label: const Text('Log out'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Constants.errorColor,
-                side: const BorderSide(color: Constants.errorColor),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Constants.backgroundLight,
+            border: Border(
+              bottom: BorderSide(
+                color: Constants.primaryColor.withOpacity(0.1),
               ),
             ),
           ),
-        ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark ? Colors.white12 : Colors.black.withOpacity(0.05),
+                ),
+                child: const Icon(Icons.arrow_back, size: 20),
+              ),
+              Text(
+                'Profile',
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isDark ? Colors.white12 : Colors.black.withOpacity(0.05),
+                ),
+                child: const Icon(Icons.settings, size: 20),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 32),
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      width: 128,
+                      height: 128,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Constants.primaryColor.withOpacity(0.2), width: 4),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 10,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
+                            ? ClipOval(
+                                child: Image.network(user.profileImageUrl!, fit: BoxFit.cover),
+                              )
+                            : Container(
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Constants.primaryColor,
+                                ),
+                                child: const Icon(Icons.person, size: 60, color: Colors.white),
+                              ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Constants.primaryColor,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF0F172A) : Constants.backgroundLight,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.verified, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  user.name,
+                  style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ID: AYU-${user.id.hashCode.toString().substring(0, 8).toUpperCase()}',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Constants.primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await authProvider.signOut();
+                    if (context.mounted) {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.logout, size: 20),
+                  label: const Text('Log out'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red.shade500,
+                    side: BorderSide(color: Colors.red.withOpacity(0.2), width: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8, bottom: 16),
+                        child: Text(
+                          'ACCOUNT SETTINGS',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                            color: isDark ? Colors.white54 : Colors.grey.shade500,
+                          ),
+                        ),
+                      ),
+                      _buildProfileMenuItem(
+                        icon: Icons.person_outline,
+                        color: Constants.primaryColor,
+                        title: 'Personal Info',
+                        subtitle: 'Manage your profile details',
+                        isDark: isDark,
+                      ),
+                      _buildProfileMenuItem(
+                        icon: Icons.security,
+                        color: Colors.blue,
+                        title: 'Security',
+                        subtitle: 'Password and 2FA settings',
+                        isDark: isDark,
+                      ),
+                      _buildProfileMenuItem(
+                        icon: Icons.notifications_none,
+                        color: Colors.orange,
+                        title: 'Notifications',
+                        subtitle: 'Control alert preferences',
+                        isDark: isDark,
+                      ),
+                      _buildProfileMenuItem(
+                        icon: Icons.help_outline,
+                        color: Colors.purple,
+                        title: 'Help & Support',
+                        subtitle: 'Get assistance and FAQs',
+                        isDark: isDark,
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfileMenuItem({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required bool isDark,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: isDark ? Constants.primaryColor.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () {},
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: isDark ? Colors.white54 : Colors.black54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: isDark ? Colors.white30 : Colors.black26,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildBottomNav(bool isDark) {
     return Container(
-      padding: const EdgeInsets.only(top: 8, bottom: 28),
+      padding: const EdgeInsets.only(top: 8, bottom: 28, left: 16, right: 16),
       decoration: BoxDecoration(
-        color: (isDark ? Constants.backgroundDark : Constants.backgroundLight)
-            .withOpacity(0.95),
+        color: (isDark ? const Color(0xFF0F172A) : Colors.white).withOpacity(0.95),
         border: Border(
           top: BorderSide(
-            color: isDark ? Colors.white.withOpacity(0.1) : Colors.black12,
+            color: isDark ? const Color(0xFF1E293B) : Colors.grey.shade200,
           ),
         ),
       ),
@@ -971,8 +1285,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
         children: [
           _navItem(0, Icons.home, 'Home', isDark),
           _navItem(1, Icons.description, 'Records', isDark),
-          _navItem(2, Icons.groups, 'Doctors', isDark),
-          _navItem(3, Icons.person, 'Profile', isDark),
+          _navItem(2, Icons.video_call, 'Consult', isDark),
+          _navItem(3, Icons.account_circle, 'Profile', isDark),
         ],
       ),
     );
@@ -982,28 +1296,32 @@ class _PatientDashboardState extends State<PatientDashboard> {
     final selected = _selectedNavIndex == index;
     return InkWell(
       onTap: () => setState(() => _selectedNavIndex = index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 26,
-            color: selected
-                ? Constants.primaryColor
-                : (isDark ? Constants.textMutedDark : Constants.textMutedLight),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 26,
               color: selected
                   ? Constants.primaryColor
-                  : (isDark ? Constants.textMutedDark : Constants.textMutedLight),
+                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8)), // slate-400
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label.toUpperCase(),
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: selected
+                    ? Constants.primaryColor
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
