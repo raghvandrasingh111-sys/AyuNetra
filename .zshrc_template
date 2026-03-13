@@ -1,0 +1,26 @@
+# Flutter PATH Configuration
+# Copy this file to ~/.zshrc or add these lines to your existing ~/.zshrc
+
+# If Flutter is installed, uncomment and update the path below
+# Common Flutter installation locations:
+# - ~/flutter (if downloaded manually)
+# - ~/development/flutter
+# - /usr/local/flutter
+
+# Uncomment the line that matches your Flutter installation location:
+# export PATH="$PATH:$HOME/flutter/bin"
+# export PATH="$PATH:$HOME/development/flutter/bin"
+# export PATH="$PATH:/usr/local/flutter/bin"
+
+# If Flutter is installed via Homebrew, it should already be in PATH
+# Verify with: which flutter
+
+# Android SDK (if needed for Android development)
+# export ANDROID_HOME=$HOME/Library/Android/sdk
+# export PATH=$PATH:$ANDROID_HOME/emulator
+# export PATH=$PATH:$ANDROID_HOME/platform-tools
+# export PATH=$PATH:$ANDROID_HOME/tools
+# export PATH=$PATH:$ANDROID_HOME/tools/bin
+
+# Verify Flutter installation
+# After adding Flutter to PATH, run: flutter doctor
