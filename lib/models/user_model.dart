@@ -9,6 +9,8 @@ class UserModel {
   final String? aadharNumber;
   /// Doctor registration number (doctors only).
   final String? doctorRegistrationNumber;
+  final String? age;
+  final String? gender;
 
   UserModel({
     required this.id,
@@ -19,6 +21,8 @@ class UserModel {
     this.profileImageUrl,
     this.aadharNumber,
     this.doctorRegistrationNumber,
+    this.age,
+    this.gender,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +35,8 @@ class UserModel {
       profileImageUrl: json['profile_image_url'] as String?,
       aadharNumber: json['aadhar_number'] as String?,
       doctorRegistrationNumber: json['doctor_registration_number'] as String?,
+      age: json['age']?.toString(),
+      gender: json['gender'] as String?,
     );
   }
 
@@ -44,6 +50,8 @@ class UserModel {
       'profile_image_url': profileImageUrl,
       'aadhar_number': aadharNumber,
       'doctor_registration_number': doctorRegistrationNumber,
+      'age': age,
+      'gender': gender,
     };
   }
 }

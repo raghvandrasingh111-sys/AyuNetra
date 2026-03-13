@@ -10,7 +10,7 @@ class GeminiService {
 
   GeminiService()
       : _model = GenerativeModel(
-          model: 'gemini-2.5-flash', // A more cost-effective model
+          model: 'gemini-2.5-flash', 
           apiKey: Constants.geminiApiKey,
         );
 
@@ -70,19 +70,26 @@ class GeminiService {
     }
   }
 
-  /// Analyzes a lab report (image or PDF) and returns a structured summary
-  /// with patient-friendly advice.
-  Future<Map<String, dynamic>> analyzeLabReport(Uint8List fileBytes, bool isPdf) async {
+  /// Analyzes a medical record (image or PDF) and returns a structured summary
+  /// formatted for the V2 detail screen UI.
+  Future<Map<String, dynamic>> analyzeMedicalRecord(Uint8List fileBytes, bool isPdf) async {
     final mimeType = isPdf ? 'application/pdf' : 'image/jpeg';
     
     final prompt = '''
-You are an expert AI medical assistant. Analyze the provided lab report and generate a simple, patient-friendly summary.
-Do NOT output Markdown formatting like ```json. Output ONLY a valid JSON object with the following exact keys:
+You are an expert AI medical assistant. Analyze the provided medical record (prescription or lab report) and extract key health data.
+Do NOT output Markdown formatting like ```json. Output ONLY a valid JSON object with the following exact structure:
 {
-  "summary": "A 2-3 sentence overarching summary of the lab report findings in simple terms.",
-  "instructions": "A bulleted list or 1-2 sentence advice on actionable next steps based on these results (e.g., 'Discuss elevated cholesterol with your doctor', 'Maintain healthy diet')."
+  "healthScore": <integer 0-100 representing overall health based on this document, use 85 if it's a routine prescription>,
+  "riskLevel": "<Low, Moderate, or High>",
+  "insights": [
+    {"iconType": "<check, lightbulb, analytics, or warning>", "text": "<Actionable insight, observation, or medication instruction>"}
+  ],
+  "indicators": [
+    {"title": "<e.g., Blood Glucose, Hemoglobin, Blood Pressure, etc.>", "value": "<value with unit>", "markerOffset": <float between 0.0 and 1.0 (0.5 is perfectly normal, 0.1 is very low, 0.9 is very high)>}
+  ],
+  "summary": "<2-3 sentence overview of the document>"
 }
-If the document does not appear to be a lab report, return a summary stating that and empty instructions.
+Make sure to extract up to 3-5 insights (these can include medication directions if it's a prescription) and any measurable indicators found in the document.
 ''';
 
     try {
@@ -110,19 +117,34 @@ If the document does not appear to be a lab report, return a summary stating tha
       final parsed = jsonDecode(jsonStr.trim()) as Map<String, dynamic>;
       
       return {
-        'summary': parsed['summary'] ?? 'Lab report analyzed. Review the attached file for details.',
+        // We encode the parsed JSON map into a string so it gets safely saved into the 'ai_summary' string column in the DB
+        'summary': jsonEncode(parsed),
         'medications': <String>[],
         'dosage': null,
-        'instructions': parsed['instructions'] ?? 'Review lab results with your doctor.',
+        'instructions': null,
       };
     } catch (e) {
-      print('Error analyzing lab report: $e');
+      print('Error analyzing medical record: $e');
+      final fallback = {
+        "healthScore": 0,
+        "riskLevel": "Unknown",
+        "insights": [
+          {"iconType": "warning", "text": "Could not automatically analyze the record. Please review the attached file manually."}
+        ],
+        "indicators": [],
+        "summary": "Analysis failed."
+      };
       return {
-        'summary': 'Could not automatically analyze the lab report. Review the attached file for details.',
+        'summary': jsonEncode(fallback),
         'medications': <String>[],
         'dosage': null,
-        'instructions': 'Review lab results with your doctor.',
+        'instructions': null,
       };
     }
+  }
+
+  // Backwards compatibility alias
+  Future<Map<String, dynamic>> analyzeLabReport(Uint8List fileBytes, bool isPdf) async {
+    return analyzeMedicalRecord(fileBytes, isPdf);
   }
 }

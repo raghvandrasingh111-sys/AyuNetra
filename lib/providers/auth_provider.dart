@@ -133,6 +133,8 @@ class AuthProvider with ChangeNotifier {
         profileImageUrl: profile['profile_image_url']?.toString(),
         aadharNumber: profile['aadhar_number']?.toString(),
         doctorRegistrationNumber: profile['doctor_registration_number']?.toString(),
+        age: profile['age']?.toString(),
+        gender: profile['gender']?.toString(),
       );
 
       _isLoading = false;
@@ -192,6 +194,8 @@ class AuthProvider with ChangeNotifier {
     String? email,
     String? aadharNumber,
     String? doctorRegistrationNumber,
+    String? age,
+    String? gender,
   }) async {
     try {
       _isLoading = true;
@@ -252,6 +256,8 @@ class AuthProvider with ChangeNotifier {
             'name': name.trim(),
             'user_type': userType,
             'aadhar_number': aadhar,
+            'age': age,
+            'gender': gender,
           }, onConflict: 'id');
         } catch (_) {}
 
@@ -261,6 +267,8 @@ class AuthProvider with ChangeNotifier {
           name: name.trim(),
           userType: userType,
           aadharNumber: aadhar,
+          age: age,
+          gender: gender,
         );
       } else {
         // Doctor: registration number must not contain @ (we append @ayunetra.doctor)
@@ -367,6 +375,8 @@ class AuthProvider with ChangeNotifier {
         profileImageUrl: profile['profile_image_url']?.toString(),
         aadharNumber: profile['aadhar_number']?.toString(),
         doctorRegistrationNumber: profile['doctor_registration_number']?.toString(),
+        age: profile['age']?.toString(),
+        gender: profile['gender']?.toString(),
       );
       notifyListeners();
     } catch (_) {
@@ -400,6 +410,8 @@ class AuthProvider with ChangeNotifier {
         profileImageUrl: profile['profile_image_url']?.toString(),
         aadharNumber: profile['aadhar_number']?.toString(),
         doctorRegistrationNumber: profile['doctor_registration_number']?.toString(),
+        age: profile['age']?.toString(),
+        gender: profile['gender']?.toString(),
       );
     } catch (_) {
       return null;

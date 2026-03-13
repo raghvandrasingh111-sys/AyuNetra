@@ -3,9 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
+import 'package:provider/provider.dart';
 import '../../models/prescription_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/constants.dart';
-import '../../services/ai_service.dart';
 
 class PrescriptionDetailScreen extends StatefulWidget {
   final Prescription prescription;
@@ -21,31 +22,28 @@ class PrescriptionDetailScreen extends StatefulWidget {
 }
 
 class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
-  final AIService _aiService = AIService();
-  String? _patientBriefing;
-  bool _isLoadingBriefing = false;
+  Map<String, dynamic>? _parsedSummary;
 
   @override
   void initState() {
     super.initState();
-    _generateBriefing();
+    _parseSummary();
   }
 
-  Future<void> _generateBriefing() async {
-    setState(() {
-      _isLoadingBriefing = true;
-    });
-
-    try {
-      final briefing = await _aiService.generatePatientBriefing(widget.prescription);
-      setState(() {
-        _patientBriefing = briefing;
-        _isLoadingBriefing = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoadingBriefing = false;
-      });
+  void _parseSummary() {
+    final summaryStr = widget.prescription.aiSummary;
+    if (summaryStr != null && summaryStr.isNotEmpty) {
+      try {
+        _parsedSummary = jsonDecode(summaryStr);
+      } catch (e) {
+        // Fallback for old records that just had text
+        _parsedSummary = {
+          'healthScore': 0,
+          'riskLevel': 'Unknown',
+          'insights': [{'iconType': 'description', 'text': summaryStr}],
+          'indicators': []
+        };
+      }
     }
   }
 
@@ -54,171 +52,144 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  bool get _isPdfUrl => widget.prescription.imageUrl.toLowerCase().endsWith('.pdf');
   bool get _isLabReport => widget.prescription.isLabReport;
 
-  // Extract JSON array from aiSummary if it exists
-  List<dynamic>? _extractMarkers() {
-    if (widget.prescription.aiSummary == null) return null;
-    try {
-      final regex = RegExp(r'\[.*\]', dotAll: true);
-      final match = regex.firstMatch(widget.prescription.aiSummary!);
-      if (match != null) {
-        return jsonDecode(match.group(0)!);
-      }
-    } catch (e) {
-      // Ignore JSON parsing errors
+  void _downloadOrViewFile() async {
+    final uri = Uri.parse(widget.prescription.imageUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
-    return null;
-  }
-
-  String _cleanBriefing(String? briefing) {
-    if (briefing == null) return '';
-    // Strip JSON out of the briefing if the AI returned it combined
-    final regex = RegExp(r'\[.*\]', dotAll: true);
-    return briefing.replaceAll(regex, '').trim();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF102216) : const Color(0xFFF6F8F6);
-    final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
-    final cardBgColor = isDark ? const Color(0x800F172A) : Colors.white;
-    final primaryColor = const Color(0xFF10B748);
+    final bgColor = isDark ? Constants.backgroundDark : Constants.backgroundLight;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final mutedColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final cardBgColor = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
 
     return Scaffold(
       backgroundColor: bgColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              decoration: BoxDecoration(
-                color: (isDark ? const Color(0xFF102216) : const Color(0xFFF6F8F6)).withOpacity(0.8),
-                border: Border(bottom: BorderSide(color: primaryColor.withOpacity(0.1))),
-              ),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: primaryColor.withOpacity(0.05),
-                      ),
-                      child: Icon(Icons.arrow_back, color: textColor),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _isLabReport ? 'Lab Report Details' : 'Prescription Details',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 40), // Balance the flex row
-                ],
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            backgroundColor: (isDark ? Constants.backgroundDark : Constants.backgroundLight).withValues(alpha: 0.8),
+            pinned: true,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back, color: textColor),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: Text(
+              _isLabReport ? 'Lab Report Details' : 'Prescription Details',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textColor,
               ),
             ),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            centerTitle: true,
+            actions: [
+              IconButton(
+                icon: Icon(Icons.share, color: textColor),
+                onPressed: () {},
+              ),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Hero Section with Gradient & Avatar
+                Stack(
+                  clipBehavior: Clip.none,
                   children: [
-                    // Top Card: Preview
                     Container(
+                      height: 180,
                       decoration: BoxDecoration(
-                        color: cardBgColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: primaryColor.withOpacity(0.1)),
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Constants.primaryColor.withValues(alpha: 0.2),
+                            Constants.primaryColor.withValues(alpha: 0.05),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      child: Stack(
                         children: [
-                          // Preview Area
-                          Container(
-                            height: 160,
-                            color: primaryColor.withOpacity(0.05),
-                            padding: const EdgeInsets.all(16),
-                            child: _isPdfUrl
-                                ? Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Icon(Icons.description, size: 72, color: primaryColor),
-                                      Positioned(
-                                        bottom: 30, // Tweak as needed based on icon size
-                                        right: MediaQuery.of(context).size.width / 2 - 40,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: primaryColor,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 2),
-                                          ),
-                                          padding: const EdgeInsets.all(2),
-                                          child: const Icon(Icons.check_circle, size: 14, color: Colors.white),
-                                        ),
-                                      )
-                                    ],
-                                  )
-                                : CachedNetworkImage(
-                                    imageUrl: widget.prescription.imageUrl,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                                    errorWidget: (context, url, err) => const Icon(Icons.error),
-                                  ),
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: RadialGradient(
+                                  center: Alignment.center,
+                                  radius: 1.0,
+                                  colors: [
+                                    Constants.primaryColor.withValues(alpha: 0.4),
+                                    Colors.transparent,
+                                  ],
+                                  stops: const [0.0, 1.0],
+                                ),
+                              ),
+                            ),
                           ),
-                          // Details Area
-                          Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          Positioned(
+                            bottom: 24,
+                            left: 24,
+                            child: Row(
                               children: [
-                                Text(
-                                  _isPdfUrl ? 'Document_Upload.pdf' : 'Scanned_Image.jpg',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: textColor,
+                                Container(
+                                  width: 96,
+                                  height: 96,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Constants.primaryColor.withValues(alpha: 0.2),
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                      width: 4,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
                                   ),
+                                  child: user != null && user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
+                                      ? ClipOval(
+                                          child: CachedNetworkImage(
+                                            imageUrl: user.profileImageUrl!,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        )
+                                      : const Icon(Icons.person, size: 48, color: Constants.primaryColor),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Verified Record • ${_formatDate(widget.prescription.createdAt)}',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: primaryColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                OutlinedButton.icon(
-                                  onPressed: () async {
-                                    final uri = Uri.parse(widget.prescription.imageUrl);
-                                    if (await canLaunchUrl(uri)) {
-                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                                    }
-                                  },
-                                  icon: Icon(_isPdfUrl ? Icons.visibility : Icons.image, color: Colors.white),
-                                  label: Text(_isPdfUrl ? 'View PDF Report' : 'View Image', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  style: OutlinedButton.styleFrom(
-                                    backgroundColor: primaryColor,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    side: BorderSide.none,
-                                    minimumSize: const Size(double.infinity, 48),
-                                  ),
+                                const SizedBox(width: 16),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user?.name ?? 'Patient Name',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'ID: AYU-${user?.id.hashCode.toString().substring(0, 8).toUpperCase() ?? 'XXXX'}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Constants.primaryColor,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -226,53 +197,283 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
                         ],
                       ),
                     ),
+                  ],
+                ),
 
-                    const SizedBox(height: 24),
-
-                    // AI Health Summary Title
-                    Row(
-                      children: [
-                        Icon(Icons.auto_awesome, color: primaryColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          'AI Health Summary',
-                          style: GoogleFonts.inter(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: textColor,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      // Status and Date Bar (overlapping slightly via negative transform)
+                      Transform.translate(
+                        offset: const Offset(0, -16),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cardBgColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.1)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'TEST DATE',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1,
+                                      color: mutedColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _formatDate(widget.prescription.createdAt),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(height: 32, width: 1, color: Constants.primaryColor.withValues(alpha: 0.2)),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'STATUS',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1,
+                                      color: mutedColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Constants.primaryColor.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      'Verified',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Constants.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Container(height: 32, width: 1, color: Constants.primaryColor.withValues(alpha: 0.2)),
+                              InkWell(
+                                onTap: _downloadOrViewFile,
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Constants.primaryColor,
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Constants.primaryColor.withValues(alpha: 0.3),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.download, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (_isLabReport) ...[
-                      // Render Lab Report Markers
-                      _buildLabMarkers(isDark),
-                    ] else ...[
-                      // Render Normal Prescription Details
-                      _buildPrescriptionDetails(isDark),
-                    ],
-
-                    const SizedBox(height: 24),
-
-                    // Patient Briefing
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: primaryColor.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: primaryColor.withOpacity(0.2)),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                      
+                      const SizedBox(height: 8),
+
+                      // --- DYNAMIC AI DASHBOARD WIDGET ---
+                      if (_parsedSummary != null) ...[
+                        Row(
+                          children: [
+                            Icon(Icons.auto_awesome, color: Constants.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              'AI Health Summary',
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                isDark ? Constants.primaryColor.withValues(alpha: 0.1) : Constants.primaryColor.withValues(alpha: 0.05),
+                                cardBgColor,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.2)),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Column(
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  children: [
+                                    // Stats Grid inside Summary
+                                    if (_parsedSummary!['healthScore'] != null && _parsedSummary!['healthScore'] > 0)
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.6),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.1)),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text('HEALTH SCORE', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: mutedColor)),
+                                                      Icon(Icons.monitor_heart, size: 18, color: Constants.primaryColor),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Container(
+                                                    height: 8,
+                                                    width: double.infinity,
+                                                    decoration: BoxDecoration(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                                                    alignment: Alignment.centerLeft,
+                                                    child: FractionallySizedBox(
+                                                      widthFactor: (_parsedSummary!['healthScore'] as num).clamp(0, 100) / 100.0, 
+                                                      child: Container(decoration: BoxDecoration(color: Constants.primaryColor, borderRadius: BorderRadius.circular(4)))
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text.rich(TextSpan(
+                                                    children: [
+                                                      TextSpan(text: '${_parsedSummary!['healthScore']}', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w900, color: textColor)),
+                                                      TextSpan(text: '/100', style: GoogleFonts.inter(fontSize: 14, color: mutedColor)),
+                                                    ],
+                                                  )),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.6) : Colors.white.withValues(alpha: 0.6),
+                                                borderRadius: BorderRadius.circular(8),
+                                                border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.1)),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text('RISK LEVEL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: mutedColor)),
+                                                      Icon(Icons.warning, size: 18, color: _getRiskColor(_parsedSummary!['riskLevel']?.toString() ?? '')),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Container(
+                                                    height: 8,
+                                                    width: double.infinity,
+                                                    decoration: BoxDecoration(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(4)),
+                                                    alignment: Alignment.centerLeft,
+                                                    child: FractionallySizedBox(
+                                                      widthFactor: _getRiskFactor(_parsedSummary!['riskLevel']?.toString() ?? ''), 
+                                                      child: Container(decoration: BoxDecoration(color: _getRiskColor(_parsedSummary!['riskLevel']?.toString() ?? ''), borderRadius: BorderRadius.circular(4)))
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text('${_parsedSummary!['riskLevel'] ?? 'Unknown'}', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w900, color: textColor), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    
+                                    if (_parsedSummary!['healthScore'] != null && _parsedSummary!['healthScore'] > 0)
+                                      const SizedBox(height: 24),
+
+                                    // Dynamic Insight list items
+                                    if (_parsedSummary!['insights'] != null)
+                                      ...(_parsedSummary!['insights'] as List).map((insight) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 16),
+                                          child: _buildInsightItem(
+                                            isDark: isDark,
+                                            icon: _getIconForType(insight['iconType']?.toString() ?? ''),
+                                            iconColor: _getColorForType(insight['iconType']?.toString() ?? ''),
+                                            textColor: textColor,
+                                            text: insight['text']?.toString() ?? '',
+                                          ),
+                                        );
+                                      }).toList(),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isDark ? Constants.primaryColor.withValues(alpha: 0.05) : Constants.primaryColor.withValues(alpha: 0.1),
+                                  border: Border(top: BorderSide(color: Constants.primaryColor.withValues(alpha: 0.1))),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '(${_parsedSummary!['summary'] ?? 'Analysis powered by AyuNetra AI Engine'})',
+                                        style: GoogleFonts.inter(fontStyle: FontStyle.italic, fontSize: 10, color: mutedColor),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        if (_parsedSummary!['indicators'] != null && (_parsedSummary!['indicators'] as List).isNotEmpty) ...[
+                          const SizedBox(height: 32),
                           Row(
                             children: [
-                              Icon(Icons.psychology, color: primaryColor),
-                              const SizedBox(width: 8),
                               Text(
-                                'Patient Briefing',
+                                'Key Indicators',
                                 style: GoogleFonts.inter(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -281,178 +482,43 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          if (_isLoadingBriefing)
-                            const CircularProgressIndicator()
-                          else
+                          const SizedBox(height: 16),
+                          ...(_parsedSummary!['indicators'] as List).map((ind) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _buildProgressIndicatorCard(
+                                isDark: isDark,
+                                cardBgColor: cardBgColor,
+                                textColor: textColor,
+                                mutedColor: mutedColor,
+                                title: ind['title']?.toString() ?? 'Indicator',
+                                value: ind['value']?.toString() ?? '',
+                                markerOffset: (ind['markerOffset'] as num?)?.toDouble() ?? 0.5,
+                              ),
+                            );
+                          }),
+                        ],
+                      ] else ...[
+                        Row(
+                          children: [
+                            Icon(Icons.pending, color: mutedColor),
+                            const SizedBox(width: 8),
                             Text(
-                              _patientBriefing != null && _patientBriefing!.isNotEmpty
-                                  ? _cleanBriefing(_patientBriefing)
-                                  : 'Overall, your results have been uploaded successfully. Please consult with your doctor for further details and follow the instructions provided.',
+                              'Awaiting Analysis Data',
                               style: GoogleFonts.inter(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: textColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.normal,
+                                color: mutedColor,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 40),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabMarkers(bool isDark) {
-    // If we have AI Summary JSON, parse it and render cards dynamically
-    final markers = _extractMarkers();
-
-    if (markers != null && markers.isNotEmpty) {
-      return Column(
-        children: markers.map((m) => _buildMarkerCard(
-          isDark: isDark,
-          title: m['markerName'] ?? 'Marker',
-          status: m['status'] ?? 'UNKNOWN',
-          value: m['value'] ?? '',
-          unit: m['unit'] ?? '',
-          referenceRange: m['referenceRange'] ?? '',
-          interpretation: m['interpretation'],
-        )).toList(),
-      );
-    }
-
-    // Fallback if no JSON available
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0x800F172A) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Constants.primaryColor.withOpacity(0.1)),
-      ),
-      child: Text(
-        widget.prescription.aiSummary ?? 'No lab markers extracted. Awaiting detailed analysis.',
-        style: TextStyle(color: isDark ? Colors.white : Colors.black87),
-      ),
-    );
-  }
-
-  Widget _buildMarkerCard({
-    required bool isDark,
-    required String title,
-    required String status,
-    required String value,
-    required String unit,
-    required String referenceRange,
-    String? interpretation,
-  }) {
-    Color statusColor;
-    IconData icon;
-    
-    final s = status.toUpperCase();
-    if (s == 'NORMAL') {
-      statusColor = Constants.primaryColor;
-      icon = Icons.bloodtype;
-    } else if (s == 'HIGH' || s == 'ELEVATED') {
-      statusColor = Colors.amber.shade600;
-      icon = Icons.monitor_heart; // Changed from vital_signs
-    } else if (s == 'LOW') {
-      statusColor = Colors.blue.shade500;
-      icon = Icons.opacity;
-    } else {
-      statusColor = Colors.grey.shade600;
-      icon = Icons.science;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0x800F172A) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Constants.primaryColor.withOpacity(0.1)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: statusColor),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        status,
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
+                          ],
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                if (interpretation != null && interpretation.isNotEmpty)
-                  Text(
-                    interpretation,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                    ),
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                          const SizedBox(width: 8),
-                          Text('Value: $value $unit', style: GoogleFonts.inter(fontSize: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569))),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Container(width: 6, height: 6, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                          const SizedBox(width: 8),
-                          Text('Range: $referenceRange', style: GoogleFonts.inter(fontSize: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569))),
-                        ],
-                      ),
+                      ],
+                      // --- END DYNAMIC DASHBOARD ---
+const SizedBox(height: 40),
                     ],
                   ),
+                ),
               ],
             ),
           ),
@@ -461,98 +527,147 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
     );
   }
 
-  Widget _buildPrescriptionDetails(bool isDark) {
-    return Column(
+  Widget _buildInsightItem({
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required Color textColor,
+    required String text,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.prescription.aiSummary != null && widget.prescription.aiSummary!.isNotEmpty)
-          _buildInfoCard(
-            isDark: isDark,
-            icon: Icons.description,
-            title: 'Summary',
-            content: widget.prescription.aiSummary!,
-            color: Colors.blue,
+        Container(
+          margin: const EdgeInsets.only(top: 2),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.2),
+            shape: BoxShape.circle,
           ),
-        if (widget.prescription.medications != null && widget.prescription.medications!.isNotEmpty)
-          _buildInfoCard(
-            isDark: isDark,
-            icon: Icons.medication,
-            title: 'Medications',
-            content: widget.prescription.medications!.join(', '),
-            color: Colors.amber.shade600,
+          child: Icon(icon, color: iconColor, size: 14),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+            ),
           ),
-        if (widget.prescription.dosage != null && widget.prescription.dosage!.isNotEmpty)
-          _buildInfoCard(
-            isDark: isDark,
-            icon: Icons.schedule,
-            title: 'Dosage',
-            content: widget.prescription.dosage!,
-            color: Constants.primaryColor,
-          ),
-        if (widget.prescription.instructions != null && widget.prescription.instructions!.isNotEmpty)
-          _buildInfoCard(
-            isDark: isDark,
-            icon: Icons.assignment,
-            title: 'Instructions',
-            content: widget.prescription.instructions!,
-            color: Colors.purple.shade400,
-          ),
+        ),
       ],
     );
   }
 
-  Widget _buildInfoCard({
+  Widget _buildProgressIndicatorCard({
     required bool isDark,
-    required IconData icon,
+    required Color cardBgColor,
+    required Color textColor,
+    required Color mutedColor,
     required String title,
-    required String content,
-    required Color color,
+    required String value,
+    required double markerOffset,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0x800F172A) : Colors.white,
+        color: cardBgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Constants.primaryColor.withOpacity(0.1)),
+        border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.05)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+          ),
+        ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155))),
+              Text(value, style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: textColor)),
+            ],
+          ),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(8),
+            height: 16,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : Colors.black87,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  Expanded(flex: 25, child: Container(color: Colors.amber.withValues(alpha: 0.3))),
+                  Expanded(
+                    flex: 50,
+                    child: Stack(
+                      children: [
+                        Container(color: Constants.primaryColor),
+                        Align(
+                          alignment: FractionalOffset(markerOffset, 0),
+                          child: Container(width: 4, color: Colors.white.withValues(alpha: 0.7)),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  content,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    height: 1.5,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                  ),
-                ),
-              ],
+                  Expanded(flex: 25, child: Container(color: Colors.redAccent.withValues(alpha: 0.3))),
+                ],
+              ),
             ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('LOW', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: mutedColor)),
+              Text('NORMAL', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: Constants.primaryColor)),
+              Text('HIGH', style: GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.bold, color: mutedColor)),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Color _getRiskColor(String risk) {
+    if (risk.toLowerCase() == 'low') return Constants.primaryColor;
+    if (risk.toLowerCase() == 'moderate') return Colors.amber;
+    if (risk.toLowerCase() == 'high') return Colors.redAccent;
+    return Colors.grey;
+  }
+
+  double _getRiskFactor(String risk) {
+    if (risk.toLowerCase() == 'low') return 0.25;
+    if (risk.toLowerCase() == 'moderate') return 0.5;
+    if (risk.toLowerCase() == 'high') return 0.85;
+    return 0.1;
+  }
+
+  IconData _getIconForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'check': return Icons.check;
+      case 'lightbulb': return Icons.lightbulb;
+      case 'analytics': return Icons.analytics;
+      case 'warning': return Icons.warning;
+      case 'medication': return Icons.medication;
+      default: return Icons.info_outline;
+    }
+  }
+
+  Color _getColorForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'check': return Constants.primaryColor;
+      case 'lightbulb': return Colors.amber.shade600;
+      case 'analytics': return Colors.blue.shade400;
+      case 'warning': return Colors.redAccent;
+      case 'medication': return Colors.purple.shade400;
+      default: return Constants.primaryColor;
+    }
   }
 }

@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../utils/constants.dart';
 import '../doctor/doctor_dashboard.dart';
 import '../patient/patient_dashboard.dart';
+import 'digilocker_verification_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
@@ -38,6 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
   late bool _isLogin;
   final _nameController = TextEditingController();
   bool _obscurePassword = true;
+  String? _digiLockerAge;
+  String? _digiLockerGender;
+  bool _isDigiLockerVerified = false;
 
   @override
   void initState() {
@@ -83,6 +87,8 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _selectedUserType == 'patient' ? _emailController.text.trim() : null,
         aadharNumber: _selectedUserType == 'patient' ? _aadharController.text.trim() : null,
         doctorRegistrationNumber: _selectedUserType == 'doctor' ? _doctorRegNoController.text.trim() : null,
+        age: _digiLockerAge,
+        gender: _digiLockerGender,
       );
     }
 
@@ -106,6 +112,9 @@ class _LoginScreenState extends State<LoginScreen> {
           _nameController.clear();
           _passwordController.clear();
           _aadharController.clear();
+          _isDigiLockerVerified = false;
+          _digiLockerAge = null;
+          _digiLockerGender = null;
         });
         return;
       }
@@ -126,6 +135,33 @@ class _LoginScreenState extends State<LoginScreen> {
           backgroundColor: Constants.errorColor,
         ),
       );
+    }
+  }
+
+  void _handleDigiLockerVerification() async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const DigiLockerVerificationDialog(),
+    );
+
+    if (result != null) {
+      setState(() {
+        _aadharController.text = result['aadhar'];
+        _nameController.text = result['name'];
+        _digiLockerAge = result['age'];
+        _digiLockerGender = result['gender'];
+        _isDigiLockerVerified = true;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('DigiLocker verification successful! Fields auto-filled.'),
+            backgroundColor: Constants.successColor,
+          ),
+        );
+      }
     }
   }
 
@@ -213,6 +249,35 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 16),
                           if (!_isLogin) ...[
+                            if (_selectedUserType == 'patient') ...[
+                              InkWell(
+                                onTap: _handleDigiLockerVerification,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: const Color(0xFF2563EB)),
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.shield, color: Color(0xFF2563EB), size: 18),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isDigiLockerVerified ? 'Verified with DigiLocker' : 'Auto-fill with DigiLocker',
+                                        style: GoogleFonts.poppins(
+                                          fontWeight: FontWeight.w600,
+                                          color: const Color(0xFF2563EB),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             _field(
                               context,
                               isDark: isDark,
@@ -220,6 +285,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: _nameController,
                               label: 'Full Name',
                               icon: Icons.person_outline,
+                              readOnly: _isDigiLockerVerified,
                               validator: (value) {
                                 if (value == null || value.isEmpty) return 'Please enter your name';
                                 return null;
@@ -254,6 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 icon: Icons.badge_outlined,
                                 keyboardType: TextInputType.number,
                                 maxLength: 14,
+                                readOnly: _isDigiLockerVerified,
                                 validator: (value) {
                                   if (!_isLogin && (value == null || value.isEmpty)) {
                                     return 'Please enter your Aadhar number';
@@ -391,12 +458,14 @@ class _LoginScreenState extends State<LoginScreen> {
     String? hintText,
     TextInputType? keyboardType,
     int? maxLength,
+    bool readOnly = false,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       maxLength: maxLength,
+      readOnly: readOnly,
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,

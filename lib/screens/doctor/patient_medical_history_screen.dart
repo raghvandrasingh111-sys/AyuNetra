@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'dart:convert';
 
 import '../../models/prescription_model.dart';
 import '../../models/user_model.dart';
@@ -127,7 +128,7 @@ class _PatientMedicalHistoryScreenState
     final bgColor = isDark ? Constants.backgroundDark : Constants.backgroundLight;
     final cardColor = isDark ? Constants.cardDark : Colors.white;
     final borderColor =
-        isDark ? Colors.white.withOpacity(0.1) : Colors.black12;
+        isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05);
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -153,7 +154,7 @@ class _PatientMedicalHistoryScreenState
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 100),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -180,11 +181,11 @@ class _PatientMedicalHistoryScreenState
     final bg = isDark ? Constants.backgroundDark : Constants.backgroundLight;
     return SliverAppBar(
       pinned: true,
-      backgroundColor: bg.withOpacity(0.9),
+      backgroundColor: bg.withOpacity(0.95),
       elevation: 0,
       leading: IconButton(
         icon: Icon(
-          Icons.arrow_back_ios,
+          Icons.arrow_back_ios_new,
           color: isDark ? Colors.white : Colors.black87,
           size: 20,
         ),
@@ -202,11 +203,13 @@ class _PatientMedicalHistoryScreenState
       actions: [
         IconButton(
           icon: Icon(
-            Icons.share,
-            color: Constants.primaryColor,
+            Icons.ios_share_rounded,
+            color: isDark ? Colors.white : Colors.black87,
+            size: 22,
           ),
           onPressed: _shareHistory,
         ),
+        const SizedBox(width: 8),
       ],
     );
   }
@@ -223,36 +226,51 @@ class _PatientMedicalHistoryScreenState
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(24),
+      margin: const EdgeInsets.fromLTRB(24, 8, 24, 16),
       decoration: BoxDecoration(
         color: cardColor,
-        border: Border(bottom: BorderSide(color: borderColor)),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: SizedBox(
-              width: 64,
-              height: 64,
-              child: patient.profileImageUrl != null &&
-                      patient.profileImageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: patient.profileImageUrl!,
-                      fit: BoxFit.cover,
-                    )
-                  : Container(
-                      color: Constants.primaryColor.withOpacity(0.2),
-                      child: Icon(
-                        Icons.person,
-                        size: 32,
-                        color: Constants.primaryColor,
+          Container(
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Constants.primaryColor.withOpacity(0.3), width: 2),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: SizedBox(
+                width: 60,
+                height: 60,
+                child: patient.profileImageUrl != null &&
+                        patient.profileImageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: patient.profileImageUrl!,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        color: Constants.primaryColor.withOpacity(0.1),
+                        child: Icon(
+                          Icons.person,
+                          size: 32,
+                          color: Constants.primaryColor,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,35 +283,33 @@ class _PatientMedicalHistoryScreenState
                     color: isDark ? Colors.white : Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
-                        vertical: 2,
+                        vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.1)
-                            : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(4),
+                        color: Constants.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         'Patient',
                         style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: isDark ? Colors.white70 : Colors.black54,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Constants.primaryColor,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       _maskAadhar(patient.aadharNumber),
-                      style: TextStyle(
+                      style: GoogleFonts.firaCode(
                         fontSize: 12,
-                        fontFamily: 'monospace',
                         color: isDark ? Colors.white54 : Colors.black45,
                       ),
                     ),
@@ -303,7 +319,7 @@ class _PatientMedicalHistoryScreenState
                 Row(
                   children: [
                     Icon(
-                      Icons.verified,
+                      Icons.verified_rounded,
                       size: 14,
                       color: Constants.successColor,
                     ),
@@ -334,7 +350,7 @@ class _PatientMedicalHistoryScreenState
     Color borderColor,
   ) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
@@ -362,27 +378,28 @@ class _PatientMedicalHistoryScreenState
     final selected = _filter == value;
     return GestureDetector(
       onTap: () => setState(() => _filter = value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: selected ? Constants.primaryColor : cardColor,
-          borderRadius: BorderRadius.circular(999),
-          border: selected ? null : Border.all(color: borderColor),
+          color: selected ? Constants.primaryColor : (isDark ? cardColor.withOpacity(0.5) : Colors.white),
+          borderRadius: BorderRadius.circular(100),
+          border: selected ? Border.all(color: Constants.primaryColor) : Border.all(color: borderColor),
           boxShadow: selected
               ? [
                   BoxShadow(
                     color: Constants.primaryColor.withOpacity(0.3),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
                 ]
-              : null,
+              : [],
         ),
         child: Text(
           label,
           style: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            fontSize: 13,
+            fontWeight: selected ? FontWeight.bold : FontWeight.w600,
             color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black54),
           ),
         ),
@@ -400,63 +417,73 @@ class _PatientMedicalHistoryScreenState
   ) {
     final doctorName = _doctorNames[p.doctorId] ?? 'Doctor';
     final isLabReport = p.recordType == 'lab_report';
-    final title = p.aiSummary != null && p.aiSummary!.isNotEmpty
-        ? (p.aiSummary!.length > 30 ? '${p.aiSummary!.substring(0, 30)}...' : p.aiSummary!)
-        : (isLabReport ? 'Lab Report' : 'Prescription');
-    const iconColor = Constants.primaryColor;
+    
+    // Parse the AI summary to extract insight if available
+    String summaryText = isLabReport ? 'Lab Report' : 'Prescription Document';
+    if (p.aiSummary != null && p.aiSummary!.isNotEmpty) {
+      summaryText = p.aiSummary!;
+      if (summaryText.startsWith('{')) {
+        try {
+          final Map<String, dynamic> data = jsonDecode(summaryText);
+          summaryText = data['summary'] ?? (isLabReport ? 'Lab Report' : 'Prescription Document');
+        } catch (_) {}
+      }
+    }
+    
+    final title = summaryText.length > 40 ? '${summaryText.substring(0, 40)}...' : summaryText;
+    final iconColor = isLabReport ? Colors.blue : Constants.primaryColor;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 32),
+      padding: EdgeInsets.only(bottom: isLast ? 0 : 24),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Column(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                margin: const EdgeInsets.only(top: 8),
+                width: 12,
+                height: 12,
                 decoration: BoxDecoration(
                   color: iconColor,
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isDark ? Constants.backgroundDark : Constants.backgroundLight,
-                    width: 4,
+                    width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
+                      color: iconColor.withOpacity(0.4),
+                      blurRadius: 6,
                     ),
                   ],
-                ),
-                child: Icon(
-                  isLabReport ? Icons.description : Icons.medication,
-                  color: Colors.white,
-                  size: 20,
                 ),
               ),
               if (!isLast)
                 Container(
                   width: 2,
-                  height: 48,
-                  margin: const EdgeInsets.only(top: 4),
-                  color: isDark ? Colors.white24 : Colors.grey.shade300,
+                  height: 160,
+                  margin: const EdgeInsets.only(top: 4, bottom: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white10 : Colors.black.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: cardColor,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: borderColor),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
@@ -464,57 +491,71 @@ class _PatientMedicalHistoryScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              isLabReport ? 'LAB REPORT' : 'PRESCRIPTION',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
-                                color: Constants.primaryColor,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              title,
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                          ],
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: iconColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          isLabReport ? 'LAB REPORT' : 'PRESCRIPTION',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: iconColor,
+                          ),
                         ),
                       ),
                       Text(
                         _formatDate(p.createdAt),
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                           color: isDark ? Colors.white54 : Colors.black45,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      height: 1.4,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Icon(
-                        Icons.medical_information,
-                        size: 14,
-                        color: isDark ? Colors.white54 : Colors.black45,
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.white54.withOpacity(0.1) : Colors.black.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.medical_services_rounded,
+                          size: 12,
+                          color: isDark ? Colors.white70 : Colors.black54,
+                        ),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$doctorName • ${isLabReport ? 'Lab Report' : 'Prescription'}',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: isDark ? Colors.white54 : Colors.black45,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          doctorName,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? Colors.white70 : Colors.black54,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -523,65 +564,51 @@ class _PatientMedicalHistoryScreenState
                   Row(
                     children: [
                       Expanded(
-                        child: Material(
-                          color: isDark
-                              ? Colors.white.withOpacity(0.08)
-                              : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      PrescriptionDetailScreen(prescription: p),
-                                ),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                                horizontal: 12,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => PrescriptionDetailScreen(prescription: p),
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.visibility,
-                                    size: 18,
-                                    color: isDark ? Colors.white70 : Colors.black87,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'View Document',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? Colors.white70 : Colors.black87,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade100,
+                            foregroundColor: isDark ? Colors.white : Colors.black87,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.remove_red_eye_rounded, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                'View Details',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Material(
-                        color: Constants.primaryColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          onTap: () => _downloadPrescription(p),
+                      const SizedBox(width: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Constants.primaryColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
-                          child: const SizedBox(
-                            width: 40,
-                            height: 40,
-                            child: Icon(
-                              Icons.download,
-                              color: Constants.primaryColor,
-                              size: 20,
-                            ),
-                          ),
+                        ),
+                        child: IconButton(
+                          onPressed: () => _downloadPrescription(p),
+                          icon: const Icon(Icons.file_download_outlined),
+                          color: Constants.primaryColor,
+                          iconSize: 20,
+                          tooltip: 'Download Original',
                         ),
                       ),
                     ],
@@ -598,41 +625,49 @@ class _PatientMedicalHistoryScreenState
   Widget _buildEmptyState(BuildContext context, bool isDark) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              _filter == _RecordFilter.reports
-                  ? Icons.description_outlined
-                  : _filter == _RecordFilter.visits
-                      ? Icons.calendar_today_outlined
-                      : Icons.medical_services_outlined,
-              size: 64,
-              color: isDark ? Colors.white38 : Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _filter == _RecordFilter.reports
-                  ? 'No lab reports yet'
-                  : _filter == _RecordFilter.visits
-                      ? 'No visit records yet'
-                      : 'No records found',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white54 : Colors.black45,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.02),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _filter == _RecordFilter.reports
+                    ? Icons.description_outlined
+                    : _filter == _RecordFilter.visits
+                        ? Icons.calendar_today_outlined
+                        : Icons.medical_services_outlined,
+                size: 48,
+                color: isDark ? Colors.white38 : Colors.grey.shade400,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 24),
+            Text(
+              _filter == _RecordFilter.reports
+                  ? 'No lab reports found'
+                  : _filter == _RecordFilter.visits
+                      ? 'No visit history'
+                      : 'No medical records',
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 12),
             Text(
               _filter == _RecordFilter.all || _filter == _RecordFilter.prescriptions
-                  ? 'Prescriptions will appear here when added.'
-                  : 'This section is for future lab reports and visit notes.',
+                  ? 'There are no prescriptions or lab reports matching this filter.'
+                  : 'This patient does not have any records in this category yet.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 14,
-                color: isDark ? Colors.white38 : Colors.grey.shade600,
+                color: isDark ? Colors.white54 : Colors.black54,
+                height: 1.5,
               ),
             ),
           ],

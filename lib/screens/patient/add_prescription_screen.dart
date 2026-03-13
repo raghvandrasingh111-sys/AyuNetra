@@ -98,9 +98,10 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
   Future<void> _savePrescription() async {
     if (_selectedFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an image or PDF file'),
+        SnackBar(
+          content: Text('Please select an image or PDF file', style: GoogleFonts.inter()),
           backgroundColor: Constants.errorColor,
+          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -114,8 +115,15 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark ? Constants.backgroundDark : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const CircularProgressIndicator(color: Constants.primaryColor),
+        ),
       ),
     );
 
@@ -127,9 +135,10 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
           if (mounted) {
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Please enter the patient\'s Aadhar number'),
+              SnackBar(
+                content: Text('Please enter the patient\'s Aadhar number', style: GoogleFonts.inter()),
                 backgroundColor: Constants.errorColor,
+                behavior: SnackBarBehavior.floating,
               ),
             );
           }
@@ -139,10 +148,11 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         if (patientId == null && mounted) {
           Navigator.of(context).pop();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No patient found with this Aadhar number. Ask them to sign up with this Aadhar first.'),
+            SnackBar(
+              content: Text('No patient found with this Aadhar number. Ask them to sign up with this Aadhar first.', style: GoogleFonts.inter()),
               backgroundColor: Constants.errorColor,
-              duration: Duration(seconds: 4),
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
             ),
           );
           return;
@@ -151,25 +161,8 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         patientId = authProvider.currentUser!.id;
       }
 
-      // Analyze with AI
-      Map<String, dynamic> aiSummary;
-      final isLabReport = _recordType == 'lab_report';
-      
-      if (isLabReport) {
-        // Use Gemini for Lab Reports (both Image and PDF)
-        aiSummary = await GeminiService().analyzeLabReport(_selectedFileBytes!, _isPdf);
-      } else if (_isPdf) {
-        // Fallback for PDF Prescriptions (since AIService OCR is image-only)
-        aiSummary = {
-          'summary': 'PDF prescription document. Review the attached file for details.',
-          'medications': <String>[],
-          'dosage': 'As prescribed',
-          'instructions': 'Follow doctor\'s instructions',
-        };
-      } else {
-        // Use on-device OCR for Image Prescriptions
-        aiSummary = await prescriptionProvider.analyzePrescriptionFromBytes(_selectedFileBytes!);
-      }
+      // Analyze with AI using Gemini for all records (both PDF and Images)
+      Map<String, dynamic> aiSummary = await GeminiService().analyzeMedicalRecord(_selectedFileBytes!, _isPdf);
 
       // Upload file to Supabase Storage (can fail with 403 if Storage policies missing)
       final extension = _isPdf ? 'pdf' : 'jpg';
@@ -181,9 +174,10 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
           Navigator.of(context).pop(); // Close loading dialog
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_formatUploadError(e)),
+              content: Text(_formatUploadError(e), style: GoogleFonts.inter()),
               backgroundColor: Constants.errorColor,
               duration: const Duration(seconds: 6),
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -211,17 +205,19 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
             SnackBar(
               content: Text(_recordType == 'lab_report'
                   ? 'Lab report added successfully!'
-                  : 'Prescription added successfully!'),
+                  : 'Prescription added successfully!', style: GoogleFonts.inter()),
               backgroundColor: Constants.primaryColor,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                prescriptionProvider.errorMessage ?? 'Failed to save prescription.',
+                prescriptionProvider.errorMessage ?? 'Failed to save prescription.', style: GoogleFonts.inter()
               ),
               backgroundColor: Constants.errorColor,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -231,9 +227,10 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         Navigator.of(context).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_formatPrescriptionError(e)),
+            content: Text(_formatPrescriptionError(e), style: GoogleFonts.inter()),
             backgroundColor: Constants.errorColor,
             duration: const Duration(seconds: 6),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -255,14 +252,22 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
   Widget _recordTypeChip({required String label, required IconData icon, required String value}) {
     final selected = _recordType == value;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Material(
-      color: selected ? Constants.primaryColor : (isDark ? Colors.white12 : Colors.grey[200]),
-      borderRadius: BorderRadius.circular(12),
+      color: selected ? Constants.primaryColor : (isDark ? Colors.white12 : Colors.grey[100]),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: () => setState(() => _recordType = value),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? Constants.primaryColor : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05)),
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -274,9 +279,9 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
               const SizedBox(width: 8),
               Text(
                 label,
-                style: GoogleFonts.poppins(
+                style: GoogleFonts.inter(
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w600,
                   color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                 ),
               ),
@@ -301,191 +306,331 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final isDoctor = authProvider.currentUser?.userType == 'doctor';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? Constants.backgroundDark : Constants.backgroundLight,
       appBar: AppBar(
-        title: const Text('Add Prescription'),
+        title: Text('Add New Record', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        foregroundColor: isDark ? Colors.white : Colors.black87,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(Constants.paddingLarge),
+        padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Record type: Prescription or Lab Report
-            Text(
-              'Record Type',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white70
-                    : Colors.black87,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? Constants.cardDark.withOpacity(0.4) : Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Constants.primaryColor.withOpacity(0.05)),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _recordTypeChip(
-                    label: 'Prescription',
-                    icon: Icons.medication,
-                    value: 'prescription',
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _recordTypeChip(
-                    label: 'Lab Report',
-                    icon: Icons.description,
-                    value: 'lab_report',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // Image Selection
-            GestureDetector(
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (context) => SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.photo_library),
-                          title: const Text('Choose from Gallery'),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _pickImage();
-                          },
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.camera_alt),
-                          title: const Text('Take Photo'),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _takePhoto();
-                          },
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.picture_as_pdf),
-                          title: const Text('Pick PDF File'),
-                          onTap: () {
-                            Navigator.pop(context);
-                            _pickPdf();
-                          },
-                        ),
-                      ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Upload Details',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
                     ),
                   ),
-                );
-              },
-              child: Container(
-                height: 300,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Colors.grey[300]!,
-                    width: 2,
-                    style: BorderStyle.solid,
+                  const SizedBox(height: 20),
+                  
+                  // Record type: Prescription or Lab Report
+                  Text(
+                    'Record Type',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Constants.textMutedLight,
+                      letterSpacing: 1.0,
+                    ),
                   ),
-                ),
-                child: _selectedFileBytes == null
-                    ? Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate,
-                            size: 64,
-                            color: Colors.grey[400],
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _recordTypeChip(
+                          label: 'Prescription',
+                          icon: Icons.medication,
+                          value: 'prescription',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _recordTypeChip(
+                          label: 'Lab Report',
+                          icon: Icons.description,
+                          value: 'lab_report',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Image Selection
+                  GestureDetector(
+                    child: InkWell(
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: isDark ? Constants.cardDark : Colors.white,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Tap to select image or PDF',
-                            style: GoogleFonts.poppins(
-                              color: Colors.grey[600],
-                              fontSize: 16,
+                          builder: (context) => SafeArea(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 4,
+                                    margin: const EdgeInsets.only(bottom: 24),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.withOpacity(0.3),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  ListTile(
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Constants.primaryColor.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.photo_library, color: Constants.primaryColor),
+                                    ),
+                                    title: Text('Choose from Gallery', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _pickImage();
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.camera_alt, color: Colors.blue),
+                                    ),
+                                    title: Text('Take Photo', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _takePhoto();
+                                    },
+                                  ),
+                                  ListTile(
+                                    leading: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withOpacity(0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                                    ),
+                                    title: Text('Pick PDF File', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                                    onTap: () {
+                                      Navigator.pop(context);
+                                      _pickPdf();
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ],
-                      )
-                    : _isPdf
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.picture_as_pdf,
-                                size: 80,
-                                color: Colors.red[700],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _selectedFileName ?? 'PDF Document',
-                                style: GoogleFonts.poppins(
-                                  color: Colors.grey[700],
-                                  fontSize: 14,
-                                ),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          )
-                        : ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.memory(
-                              _selectedFileBytes!,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        height: 250,
+                        decoration: BoxDecoration(
+                          color: isDark ? Colors.black12 : Colors.grey[50],
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isDark ? Colors.white10 : Colors.black12,
+                            width: 2,
+                            style: BorderStyle.solid,
                           ),
+                        ),
+                        child: _selectedFileBytes == null
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Constants.primaryColor.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.add_photo_alternate_rounded,
+                                      size: 40,
+                                      color: Constants.primaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Tap to select image or PDF',
+                                    style: GoogleFonts.inter(
+                                      color: isDark ? Colors.white54 : Colors.black54,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : _isPdf
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.picture_as_pdf,
+                                        size: 80,
+                                        color: Colors.red[400],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                                        child: Text(
+                                          _selectedFileName ?? 'PDF Document',
+                                          style: GoogleFonts.inter(
+                                            color: isDark ? Colors.white70 : Colors.black87,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        Image.memory(
+                                          _selectedFileBytes!,
+                                          fit: BoxFit.cover,
+                                        ),
+                                        Container(
+                                          color: Colors.black.withOpacity(0.3),
+                                          child: const Center(
+                                            child: Icon(Icons.edit, color: Colors.white, size: 32),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Patient Aadhar (required for doctors)
+                  if (isDoctor) ...[
+                    Text(
+                      'Patient Assignment',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Constants.textMutedLight,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _patientAadharController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 14,
+                      style: GoogleFonts.inter(color: isDark ? Colors.white : Colors.black87),
+                      decoration: InputDecoration(
+                        labelText: 'Patient Aadhar Number',
+                        hintText: '12-digit Aadhar of the patient',
+                        prefixIcon: const Icon(Icons.badge_outlined, color: Constants.primaryColor),
+                        counterText: '',
+                        filled: true,
+                        fillColor: isDark ? Colors.black12 : Colors.grey[50],
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+
+                  // Notes
+                  Text(
+                    'Additional Context',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Constants.textMutedLight,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _notesController,
+                    maxLines: 4,
+                    style: GoogleFonts.inter(color: isDark ? Colors.white : Colors.black87),
+                    decoration: InputDecoration(
+                      labelText: 'Case Notes (Optional)',
+                      alignLabelWithHint: true,
+                      prefixIcon: const Padding(
+                        padding: EdgeInsets.only(bottom: 60), // Align to top
+                        child: Icon(Icons.note_alt_outlined, color: Constants.primaryColor),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? Colors.black12 : Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Patient Aadhar (required for doctors)
-            if (isDoctor) ...[
-              TextFormField(
-                controller: _patientAadharController,
-                keyboardType: TextInputType.number,
-                maxLength: 14,
-                decoration: const InputDecoration(
-                  labelText: 'Patient Aadhar Number',
-                  hintText: '12-digit Aadhar of the patient',
-                  prefixIcon: Icon(Icons.badge),
-                  counterText: '',
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Notes
-            TextFormField(
-              controller: _notesController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Additional Notes (Optional)',
-                prefixIcon: Icon(Icons.note),
-              ),
-            ),
+            
             const SizedBox(height: 32),
 
             // Save Button
-            ElevatedButton(
-              onPressed: _savePrescription,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text(
-                  _recordType == 'lab_report' ? 'Save Lab Report' : 'Save Prescription',
-                  style: GoogleFonts.poppins(
+            SizedBox(
+              height: 56,
+              child: ElevatedButton.icon(
+                onPressed: _savePrescription,
+                icon: const Icon(Icons.auto_awesome, color: Colors.white),
+                label: Text(
+                  _recordType == 'lab_report' ? 'Upload & Analyze Report' : 'Upload & Analyze Prescription',
+                  style: GoogleFonts.inter(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Constants.primaryColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  elevation: 0,
                 ),
               ),
             ),
+            const SizedBox(height: 40),
           ],
         ),
       ),

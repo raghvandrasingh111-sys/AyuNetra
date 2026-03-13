@@ -6,32 +6,23 @@ plugins {
 }
 
 android {
-    packaging {
-        jniLibs {
-            keepDebugSymbols += "**/*.so"
-        }
-    }
-}
-
     namespace = "com.example.sanjeevni"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-android {
-    packaging {
-        jniLibs {
-            keepDebugSymbols += "**/*.so"
-        }
+        jvmTarget = "1.8"
     }
-}
 
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("src/main/kotlin")
+        }
     }
 
     defaultConfig {
@@ -46,21 +37,18 @@ android {
     }
 
     buildTypes {
-        release {
-            release {buildTypes {
-    getByName("release") {
-        isMinifyEnabled = true
-        isShrinkResources = true
-
-        proguardFiles(
-            getDefaultProguardFile("proguard-android-optimize.txt"),
-            "proguard-rules.pro"
-        )
-    }
-}
-
-}
-
+        getByName("release") {
+            // Signing with the debug keys for now.
+            // In a real app, you would configure a release keystore here.
+            signingConfig = signingConfigs.getByName("debug")
+            
+            // Enable R8 shrinking and obfuscation
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
