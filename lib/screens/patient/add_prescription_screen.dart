@@ -23,12 +23,34 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
   bool _isPdf = false;
   String? _selectedFileName;
   String _recordType = 'prescription'; // 'prescription' or 'lab_report'
+  bool _isManualEntry = false;
+  
+  // Manual Entry Controllers
+  final _patientNameController = TextEditingController();
+  final _patientAgeController = TextEditingController();
+  final _patientHeightController = TextEditingController();
+  final _bloodPressureController = TextEditingController();
+  final _pulseRateController = TextEditingController();
+  String? _selectedGender;
+  
+  // Manual Medicines
+  final List<Map<String, String>> _manualMedicines = [];
+  final _medNameController = TextEditingController();
+  final _medTimeController = TextEditingController();
+
   final ImagePicker _picker = ImagePicker();
 
   @override
   void dispose() {
     _notesController.dispose();
     _patientAadharController.dispose();
+    _patientNameController.dispose();
+    _patientAgeController.dispose();
+    _patientHeightController.dispose();
+    _bloodPressureController.dispose();
+    _pulseRateController.dispose();
+    _medNameController.dispose();
+    _medTimeController.dispose();
     super.dispose();
   }
 
@@ -96,10 +118,21 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
   }
 
   Future<void> _savePrescription() async {
-    if (_selectedFileBytes == null) {
+    if (!_isManualEntry && _selectedFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Please select an image or PDF file', style: GoogleFonts.inter()),
+          backgroundColor: Constants.errorColor,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    
+    if (_isManualEntry && _patientNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter patient name for manual entry', style: GoogleFonts.inter()),
           backgroundColor: Constants.errorColor,
           behavior: SnackBarBehavior.floating,
         ),
@@ -161,39 +194,62 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
         patientId = authProvider.currentUser!.id;
       }
 
-      // Analyze with AI using Gemini for all records (both PDF and Images)
-      Map<String, dynamic> aiSummary = await GeminiService().analyzeMedicalRecord(_selectedFileBytes!, _isPdf);
+      Map<String, dynamic>? aiSummary;
+      String? imageUrl;
 
-      // Upload file to Supabase Storage (can fail with 403 if Storage policies missing)
-      final extension = _isPdf ? 'pdf' : 'jpg';
-      String imageUrl;
-      try {
-        imageUrl = await _uploadFile(_selectedFileBytes!, extension: extension);
-      } catch (e) {
-        if (mounted) {
-          Navigator.of(context).pop(); // Close loading dialog
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_formatUploadError(e), style: GoogleFonts.inter()),
-              backgroundColor: Constants.errorColor,
-              duration: const Duration(seconds: 6),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+      // Prepare manual medications list
+      List<String> manualMedsList = _manualMedicines.map((m) => '${m['name']} (${m['time']})').toList();
+
+      if (!_isManualEntry) {
+        // Analyze with AI using Gemini for all records (both PDF and Images)
+        aiSummary = await GeminiService().analyzeMedicalRecord(_selectedFileBytes!, _isPdf);
+
+        // Upload file to Supabase Storage
+        final extension = _isPdf ? 'pdf' : 'jpg';
+        try {
+          imageUrl = await _uploadFile(_selectedFileBytes!, extension: extension);
+        } catch (e) {
+          if (mounted) {
+            Navigator.of(context).pop(); // Close loading dialog
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(_formatUploadError(e), style: GoogleFonts.inter()),
+                backgroundColor: Constants.errorColor,
+                duration: const Duration(seconds: 6),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return;
         }
-        return;
+      } else {
+        // Connect manual entry to AI
+        aiSummary = await GeminiService().analyzeManualRecord(
+          patientName: _patientNameController.text.trim(),
+          patientAge: _patientAgeController.text.trim(),
+          bloodPressure: _bloodPressureController.text.trim(),
+          pulseRate: _pulseRateController.text.trim(),
+          gender: _selectedGender,
+          medications: manualMedsList.isEmpty ? null : manualMedsList,
+          notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        );
       }
 
-      // Create prescription record in database
       final success = await prescriptionProvider.createPrescription(
         doctorId: authProvider.currentUser!.id,
         patientId: patientId!,
         imageUrl: imageUrl,
-        notes: _notesController.text.trim().isEmpty
-            ? null
-            : _notesController.text.trim(),
+        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
         aiSummary: aiSummary,
         recordType: _recordType,
+        isManual: _isManualEntry,
+        patientName: _patientNameController.text.trim(),
+        patientAge: _patientAgeController.text.trim(),
+        patientHeight: _patientHeightController.text.trim(),
+        bloodPressure: _bloodPressureController.text.trim(),
+        pulseRate: _pulseRateController.text.trim(),
+        gender: _selectedGender,
+        manualMedications: manualMedsList.isEmpty ? null : manualMedsList,
       );
 
       if (mounted) {
@@ -292,6 +348,197 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
     );
   }
 
+  Widget _entryMethodChip({required String label, required bool isManual}) {
+    final selected = _isManualEntry == isManual;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    return Material(
+      color: selected ? Constants.primaryColor : (isDark ? Colors.white12 : Colors.grey[100]),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => setState(() => _isManualEntry = isManual),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: selected ? Constants.primaryColor : (isDark ? Colors.white10 : Colors.black.withOpacity(0.05)),
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                color: selected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildManualEntryForm(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildTextField('Patient Name', _patientNameController, Icons.person_outline, isDark),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildTextField('Age (Yrs)', _patientAgeController, Icons.calendar_today, isDark, keyboardType: TextInputType.number)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: _selectedGender,
+                items: ['Male', 'Female', 'Other']
+                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                    .toList(),
+                onChanged: (v) => setState(() => _selectedGender = v),
+                decoration: _inputDeco('Gender', Icons.people_outline, isDark),
+                dropdownColor: isDark ? Constants.cardDark : Colors.white,
+                style: GoogleFonts.inter(color: isDark ? Colors.white : Colors.black87),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: _buildTextField('Height (cm/ft)', _patientHeightController, Icons.height, isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Blood Press. (e.g. 120/80)', _bloodPressureController, Icons.favorite_border, isDark)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildTextField('Pulse (bpm)', _pulseRateController, Icons.monitor_heart_outlined, isDark, keyboardType: TextInputType.number)),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Prescription Medicines',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            color: Constants.textMutedLight,
+            letterSpacing: 1.0,
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Medicines List
+        ..._manualMedicines.map((med) => _buildMedicineTile(med, isDark)),
+        
+        // Add Medicine Row
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 2,
+              child: _buildTextField('Medicine Name', _medNameController, Icons.medication_liquid, isDark),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 1,
+              child: _buildTextField('Time/Dosage', _medTimeController, Icons.access_time, isDark),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              height: 54, // Match typical text field height
+              width: 54,
+              decoration: BoxDecoration(
+                color: Constants.primaryColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.add, color: Colors.white),
+                onPressed: () {
+                  if (_medNameController.text.trim().isNotEmpty) {
+                    setState(() {
+                      _manualMedicines.add({
+                        'name': _medNameController.text.trim(),
+                        'time': _medTimeController.text.trim().isNotEmpty ? _medTimeController.text.trim() : 'As directed',
+                      });
+                      _medNameController.clear();
+                      _medTimeController.clear();
+                    });
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMedicineTile(Map<String, String> med, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black12 : Colors.grey[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  med['name'] ?? '',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                ),
+                Text(
+                  med['time'] ?? '',
+                  style: GoogleFonts.inter(fontSize: 12, color: Constants.textMutedLight),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.redAccent, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            onPressed: () {
+              setState(() {
+                _manualMedicines.remove(med);
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDeco(String label, IconData icon, bool isDark) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, color: Constants.primaryColor, size: 20),
+      filled: true,
+      fillColor: isDark ? Colors.black12 : Colors.grey[50],
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      labelStyle: TextStyle(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54),
+    );
+  }
+
+  Widget _buildTextField(String label, TextEditingController controller, IconData icon, bool isDark, {TextInputType keyboardType = TextInputType.text}) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: GoogleFonts.inter(color: isDark ? Colors.white : Colors.black87, fontSize: 14),
+      decoration: _inputDeco(label, icon, isDark),
+    );
+  }
+
   /// User-friendly message for other save errors (e.g. DB insert).
   static String _formatPrescriptionError(dynamic e) {
     final s = e.toString().toLowerCase();
@@ -371,11 +618,33 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Entry Mode toggle (only if prescription)
+                  if (_recordType == 'prescription') ...[
+                    Text(
+                      'Entry Method',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Constants.textMutedLight,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _entryMethodChip(label: 'Upload File', isManual: false)),
+                        const SizedBox(width: 12),
+                        Expanded(child: _entryMethodChip(label: 'Manual Entry', isManual: true)),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 24),
 
-                  // Image Selection
-                  GestureDetector(
-                    child: InkWell(
+                  if (!_isManualEntry || _recordType != 'prescription') ...[
+                    // Image Selection
+                    InkWell(
                       onTap: () {
                         showModalBottomSheet(
                           context: context,
@@ -534,7 +803,12 @@ class _AddPrescriptionScreenState extends State<AddPrescriptionScreen> {
                                   ),
                       ),
                     ),
-                  ),
+                  ],
+
+                  // Manual Entry Fields
+                  if (_isManualEntry && _recordType == 'prescription') ...[
+                    _buildManualEntryForm(isDark),
+                  ],
 
                   const SizedBox(height: 24),
 

@@ -55,7 +55,9 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
   bool get _isLabReport => widget.prescription.isLabReport;
 
   void _downloadOrViewFile() async {
-    final uri = Uri.parse(widget.prescription.imageUrl);
+    final url = widget.prescription.imageUrl;
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -173,7 +175,7 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      user?.name ?? 'Patient Name',
+                                      widget.prescription.patientName ?? user?.name ?? 'Patient Name',
                                       style: GoogleFonts.inter(
                                         fontSize: 24,
                                         fontWeight: FontWeight.bold,
@@ -279,30 +281,122 @@ class _PrescriptionDetailScreenState extends State<PrescriptionDetailScreen> {
                                 ],
                               ),
                               Container(height: 32, width: 1, color: Constants.primaryColor.withValues(alpha: 0.2)),
-                              InkWell(
-                                onTap: _downloadOrViewFile,
-                                child: Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Constants.primaryColor,
-                                    borderRadius: BorderRadius.circular(8),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Constants.primaryColor.withValues(alpha: 0.3),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                              if (widget.prescription.imageUrl != null && widget.prescription.imageUrl!.isNotEmpty)
+                                InkWell(
+                                  onTap: _downloadOrViewFile,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Constants.primaryColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Constants.primaryColor.withValues(alpha: 0.3),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(Icons.download, color: Colors.white, size: 20),
                                   ),
-                                  child: const Icon(Icons.download, color: Colors.white, size: 20),
                                 ),
-                              ),
                             ],
                           ),
                         ),
                       ),
                       
                       const SizedBox(height: 8),
+
+                      // --- DYNAMIC MANUAL VItALS & MEDS ---
+                      if (widget.prescription.isManual || (widget.prescription.patientAge != null || widget.prescription.bloodPressure != null)) ...[
+                        Row(
+                          children: [
+                            Icon(Icons.monitor_heart_outlined, color: Constants.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Patient Vitals & Details',
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: cardBgColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.2)),
+                          ),
+                          child: Wrap(
+                            spacing: 16,
+                            runSpacing: 16,
+                            children: [
+                              if (widget.prescription.patientAge != null && widget.prescription.patientAge!.isNotEmpty)
+                                _buildVitalItem('Age', '${widget.prescription.patientAge} Yrs', Icons.cake, isDark),
+                              if (widget.prescription.gender != null && widget.prescription.gender!.isNotEmpty)
+                                _buildVitalItem('Gender', widget.prescription.gender!, Icons.person_outline, isDark),
+                              if (widget.prescription.patientHeight != null && widget.prescription.patientHeight!.isNotEmpty)
+                                _buildVitalItem('Height', widget.prescription.patientHeight!, Icons.height, isDark),
+                              if (widget.prescription.bloodPressure != null && widget.prescription.bloodPressure!.isNotEmpty)
+                                _buildVitalItem('BP', widget.prescription.bloodPressure!, Icons.favorite_border, isDark),
+                              if (widget.prescription.pulseRate != null && widget.prescription.pulseRate!.isNotEmpty)
+                                _buildVitalItem('Pulse', '${widget.prescription.pulseRate} bpm', Icons.timeline, isDark),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      if (widget.prescription.medications != null && widget.prescription.medications!.isNotEmpty) ...[
+                        Row(
+                          children: [
+                            Icon(Icons.medication_liquid, color: Constants.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Prescribed Medicines',
+                              style: GoogleFonts.inter(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        ...widget.prescription.medications!.map((med) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF1E293B) : Colors.grey[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Constants.primaryColor.withValues(alpha: 0.1)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle_outline, color: Constants.primaryColor, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    med,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )),
+                        const SizedBox(height: 16),
+                      ],
+                      // --- END MANUAL VITALS & MEDS ---
 
                       // --- DYNAMIC AI DASHBOARD WIDGET ---
                       if (_parsedSummary != null) ...[
@@ -557,6 +651,28 @@ const SizedBox(height: 40),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildVitalItem(String label, String value, IconData icon, bool isDark) {
+    return Container(
+      width: 100,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : Constants.backgroundLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: Constants.primaryColor),
+          const SizedBox(height: 8),
+          Text(label, style: GoogleFonts.inter(fontSize: 10, color: isDark ? Colors.white54 : Colors.black54)),
+          const SizedBox(height: 4),
+          Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
     );
   }
 

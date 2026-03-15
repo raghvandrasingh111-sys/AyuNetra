@@ -180,14 +180,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
-              Text(
-                'Wellness AI',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Constants.primaryColor,
-                ),
-              ),
             ],
           ),
           const Spacer(),

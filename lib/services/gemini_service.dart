@@ -143,6 +143,87 @@ Make sure to extract up to 3-5 insights (these can include medication directions
     }
   }
 
+  /// Analyzes a manual prescription record (typed by the user) and returns a structured summary
+  /// formatted for the V2 detail screen UI.
+  Future<Map<String, dynamic>> analyzeManualRecord({
+    String? patientName,
+    String? patientAge,
+    String? bloodPressure,
+    String? pulseRate,
+    String? gender,
+    List<String>? medications,
+    String? notes,
+  }) async {
+    final patientDetails = [
+      if (patientName != null && patientName.isNotEmpty) 'Name: $patientName',
+      if (patientAge != null && patientAge.isNotEmpty) 'Age: $patientAge',
+      if (gender != null && gender.isNotEmpty) 'Gender: $gender',
+      if (bloodPressure != null && bloodPressure.isNotEmpty) 'BP: $bloodPressure',
+      if (pulseRate != null && pulseRate.isNotEmpty) 'Pulse: $pulseRate',
+    ].join(', ');
+
+    final meds = medications?.join(', ') ?? 'None provided';
+    final extraNotes = notes ?? 'None';
+
+    final prompt = '''
+You are an expert AI medical assistant. Analyze the provided manual prescription record details and extract key health data.
+Patient Details: $patientDetails
+Prescribed Medications: $meds
+Doctor Notes: $extraNotes
+
+Do NOT output Markdown formatting like ```json. Output ONLY a valid JSON object with the following exact structure:
+{
+  "healthScore": <integer 0-100 representing overall health based on this document, use 85 if it's a routine prescription>,
+  "riskLevel": "<Low, Moderate, or High based on vitals and medications>",
+  "insights": [
+    {"iconType": "<check, lightbulb, analytics, or warning>", "text": "<Actionable insight, observation, or medication instruction based on the data>"}
+  ],
+  "indicators": [
+    {"title": "<e.g., Blood Pressure, Pulse, etc. extracted from Patient Details>", "value": "<value with unit>", "markerOffset": <float between 0.0 and 1.0 (0.5 is perfectly normal, 0.1 is very low, 0.9 is very high)>}
+  ],
+  "summary": "<2-3 sentence overview of this manual record prescription>"
+}
+Make sure to extract up to 3-5 insights (these can include medication directions) and map any provided vitals into the indicators array.
+''';
+
+    try {
+      final content = [Content.text(prompt)];
+      final response = await _model.generateContent(content);
+      final text = response.text?.trim() ?? '{}';
+      
+      String jsonStr = text;
+      if (jsonStr.startsWith('```json')) jsonStr = jsonStr.substring(7);
+      else if (jsonStr.startsWith('```')) jsonStr = jsonStr.substring(3);
+      if (jsonStr.endsWith('```')) jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+      
+      final parsed = jsonDecode(jsonStr.trim()) as Map<String, dynamic>;
+      
+      return {
+        'summary': jsonEncode(parsed),
+        'medications': medications ?? <String>[],
+        'dosage': null,
+        'instructions': null,
+      };
+    } catch (e) {
+      print('Error analyzing manual record: $e');
+      final fallback = {
+        "healthScore": 0,
+        "riskLevel": "Unknown",
+        "insights": [
+          {"iconType": "warning", "text": "Could not automatically analyze the manual record."}
+        ],
+        "indicators": [],
+        "summary": "Analysis failed."
+      };
+      return {
+        'summary': jsonEncode(fallback),
+        'medications': medications ?? <String>[],
+        'dosage': null,
+        'instructions': null,
+      };
+    }
+  }
+
   // Backwards compatibility alias
   Future<Map<String, dynamic>> analyzeLabReport(Uint8List fileBytes, bool isPdf) async {
     return analyzeMedicalRecord(fileBytes, isPdf);

@@ -221,4 +221,27 @@ Existing rows will default to `'prescription'`. New uploads can be saved as eith
 
 ---
 
+## Migration: Manual Prescription Fields
+
+Run this in the SQL Editor to support the new manual prescription fields:
+
+```sql
+-- Make image optional (for manual entry)
+ALTER TABLE public.prescriptions ALTER COLUMN image_url DROP NOT NULL;
+
+-- Add new manual fields
+ALTER TABLE public.prescriptions
+  ADD COLUMN IF NOT EXISTS patient_name TEXT,
+  ADD COLUMN IF NOT EXISTS patient_age TEXT,
+  ADD COLUMN IF NOT EXISTS patient_height TEXT,
+  ADD COLUMN IF NOT EXISTS blood_pressure TEXT,
+  ADD COLUMN IF NOT EXISTS pulse_rate TEXT,
+  ADD COLUMN IF NOT EXISTS gender TEXT,
+  ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE;
+```
+
+Existing rows will remain unchanged.
+
+---
+
 After this, run `flutter pub get` and configure `Constants.supabaseUrl` and `Constants.supabaseAnonKey` in `lib/utils/constants.dart`.

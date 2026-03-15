@@ -13,7 +13,7 @@ class Constants {
   /// Used for doctor login: email = registrationNumber + this suffix
   static const String doctorEmailSuffix = '@ayunetra.doctor';
 
-  // Google Generative AI - Replace with your key from https://aistudio.google.com/apikey
+  // Google Generative AI - Replace with your key from https://aistudio.googl e.com/apikey
   static const String geminiApiKey = ApiKeys.geminiApiKey;
 
   // App Colors (Figma / AyuNetra design)

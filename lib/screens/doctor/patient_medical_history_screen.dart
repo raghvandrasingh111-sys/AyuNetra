@@ -99,9 +99,18 @@ class _PatientMedicalHistoryScreenState
   }
 
   Future<void> _downloadPrescription(Prescription p) async {
-    final url = Uri.parse(p.imageUrl);
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+    final url = p.imageUrl;
+    if (url == null || url.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No file attached to this record')),
+        );
+      }
+      return;
+    }
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not open document')),
@@ -598,19 +607,20 @@ class _PatientMedicalHistoryScreenState
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Constants.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
+                      if (p.imageUrl != null && p.imageUrl!.isNotEmpty)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Constants.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            onPressed: () => _downloadPrescription(p),
+                            icon: const Icon(Icons.file_download_outlined),
+                            color: Constants.primaryColor,
+                            iconSize: 20,
+                            tooltip: 'Download Original',
+                          ),
                         ),
-                        child: IconButton(
-                          onPressed: () => _downloadPrescription(p),
-                          icon: const Icon(Icons.file_download_outlined),
-                          color: Constants.primaryColor,
-                          iconSize: 20,
-                          tooltip: 'Download Original',
-                        ),
-                      ),
                     ],
                   ),
                 ],

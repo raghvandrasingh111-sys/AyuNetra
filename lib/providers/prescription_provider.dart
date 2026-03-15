@@ -127,17 +127,31 @@ class PrescriptionProvider with ChangeNotifier {
   Future<bool> createPrescription({
     required String doctorId,
     required String patientId,
-    required String imageUrl,
+    String? imageUrl,
     String? notes,
     Map<String, dynamic>? aiSummary,
     String recordType = 'prescription',
+    String? patientName,
+    String? patientAge,
+    String? patientHeight,
+    String? bloodPressure,
+    String? pulseRate,
+    String? gender,
+    bool isManual = false,
+    List<String>? manualMedications,
+    String? manualDosage,
+    String? manualInstructions,
   }) async {
     try {
       _isLoading = true;
       _errorMessage = null;
       notifyListeners();
 
-      final resolved = aiSummary ?? await _aiService.analyzePrescription(imageUrl);
+      final resolved = aiSummary ?? (
+          isManual 
+            ? {'summary': notes, 'medications': manualMedications, 'dosage': manualDosage, 'instructions': manualInstructions}
+            : (imageUrl != null ? await _aiService.analyzePrescription(imageUrl) : {})
+      );
       final now = DateTime.now().toIso8601String();
 
       await _client.from('prescriptions').insert({
@@ -150,6 +164,13 @@ class PrescriptionProvider with ChangeNotifier {
         'dosage': resolved['dosage'],
         'instructions': resolved['instructions'],
         'record_type': recordType,
+        'patient_name': patientName,
+        'patient_age': patientAge,
+        'patient_height': patientHeight,
+        'blood_pressure': bloodPressure,
+        'pulse_rate': pulseRate,
+        'gender': gender,
+        'is_manual': isManual,
         'created_at': now,
         'updated_at': now,
       });
